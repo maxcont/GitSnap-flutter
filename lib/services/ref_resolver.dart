@@ -214,7 +214,7 @@ class RefResolver {
     }
   }
 
-  /// Resolve references for multiple repositories
+  /// Resolve references for multiple repositories (sequential)
   Future<Map<String, ResolvedRef>> resolveRefsForRepos(
     List<Repository> repos,
     RefType refType,
@@ -227,6 +227,31 @@ class RefResolver {
       results[repo.id] = resolved;
     }
 
+    return results;
+  }
+
+  static const int _defaultConcurrency = 5;
+
+  /// Resolve references for multiple repositories in parallel (max [concurrency] at a time)
+  Future<Map<String, ResolvedRef>> resolveRefsForReposParallel(
+    List<Repository> repos,
+    RefType refType,
+    String refValue, {
+    int concurrency = _defaultConcurrency,
+  }) async {
+    final results = <String, ResolvedRef>{};
+    for (var i = 0; i < repos.length; i += concurrency) {
+      final chunk = repos.sublist(i, i + concurrency > repos.length ? repos.length : i + concurrency);
+      final chunkResults = await Future.wait(
+        chunk.map((repo) async {
+          final resolved = await resolveRef(repo, refType, refValue);
+          return MapEntry(repo.id, resolved);
+        }),
+      );
+      for (final e in chunkResults) {
+        results[e.key] = e.value;
+      }
+    }
     return results;
   }
 }

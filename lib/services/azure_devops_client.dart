@@ -201,7 +201,12 @@ class AzureDevOpsClient {
     return 0;
   }
 
+  /// File count = number of entries in changes (one per file). Using changeCounts sum can double-count on some APIs.
   static int totalChangesFromDiff(Map<String, dynamic> data) {
+    final changes = data['changes'] as List?;
+    if (changes != null && changes.isNotEmpty) {
+      return changes.length;
+    }
     final changeCounts = data['changeCounts'];
     if (changeCounts is Map) {
       var sum = 0;
@@ -211,8 +216,7 @@ class AzureDevOpsClient {
       }
       return sum;
     }
-    final changes = data['changes'] as List?;
-    return changes?.length ?? 0;
+    return 0;
   }
 
   static List<String> filePathsFromDiff(Map<String, dynamic> data) {

@@ -192,29 +192,33 @@ class AppState extends ChangeNotifier {
           .where((r) => _selectedRepoIds.contains(r.id))
           .toList();
 
+      const parallelLimit = 5;
       final resolver = RefResolver(_client!);
-      
-      // Resolve refs
-      final sourceResolved = await resolver.resolveRefsForRepos(
+
+      // Resolve refs in parallel (max 5 at a time)
+      final sourceResolved = await resolver.resolveRefsForReposParallel(
         selectedRepos,
         _sourceRef.type,
         _sourceRef.value,
+        concurrency: parallelLimit,
       );
-      
-      final targetResolved = await resolver.resolveRefsForRepos(
+
+      final targetResolved = await resolver.resolveRefsForReposParallel(
         selectedRepos,
         _targetRef.type,
         _targetRef.value,
+        concurrency: parallelLimit,
       );
 
-      // Get diffs
+      // Get diffs in parallel (max 5 at a time)
       final diffService = DiffService(_client!);
-      _diffResults = await diffService.getDiffsForRepos(
+      _diffResults = await diffService.getDiffsForReposParallel(
         selectedRepos,
         sourceResolved,
         targetResolved,
         _sourceRef.type,
         _targetRef.type,
+        concurrency: parallelLimit,
       );
 
       _errorMessage = null;

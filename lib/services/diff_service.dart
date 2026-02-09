@@ -7,7 +7,9 @@ class DiffService {
 
   DiffService(this.client);
 
-  /// Get diff results for multiple repositories
+  static const int defaultConcurrency = 5;
+
+  /// Get diff results for multiple repositories (sequential)
   Future<List<DiffResult>> getDiffsForRepos(
     List<Repository> repos,
     Map<String, ResolvedRef> sourceRefs,
@@ -15,38 +17,59 @@ class DiffService {
     RefType sourceRefType,
     RefType targetRefType,
   ) async {
+    return getDiffsForReposParallel(
+      repos,
+      sourceRefs,
+      targetRefs,
+      sourceRefType,
+      targetRefType,
+      concurrency: 1,
+    );
+  }
+
+  /// Get diff results for multiple repositories in parallel (max [concurrency] at a time)
+  Future<List<DiffResult>> getDiffsForReposParallel(
+    List<Repository> repos,
+    Map<String, ResolvedRef> sourceRefs,
+    Map<String, ResolvedRef> targetRefs,
+    RefType sourceRefType,
+    RefType targetRefType, {
+    int concurrency = defaultConcurrency,
+  }) async {
     final results = <DiffResult>[];
 
-    for (final repo in repos) {
-      final sourceRef = sourceRefs[repo.id];
-      final targetRef = targetRefs[repo.id];
-
-      if (sourceRef == null || targetRef == null) {
-        results.add(DiffResult(
-          repoId: repo.id,
-          repoName: repo.name,
-          status: DiffStatus.error,
-          note: 'Missing ref resolution',
-        ));
-        continue;
-      }
-
-      if (sourceRef.error != null || targetRef.error != null) {
-        results.add(DiffResult(
-          repoId: repo.id,
-          repoName: repo.name,
-          status: DiffStatus.error,
-          note: sourceRef.error ?? targetRef.error,
-        ));
-        continue;
-      }
-
-      final result = await _getDiffForRepo(
-        repo,
-        sourceRef,
-        targetRef,
+    for (var i = 0; i < repos.length; i += concurrency) {
+      final chunk = repos.sublist(
+        i,
+        i + concurrency > repos.length ? repos.length : i + concurrency,
       );
-      results.add(result);
+      final chunkResults = await Future.wait(
+        chunk.map((repo) async {
+          final sourceRef = sourceRefs[repo.id];
+          final targetRef = targetRefs[repo.id];
+
+          if (sourceRef == null || targetRef == null) {
+            return DiffResult(
+              repoId: repo.id,
+              repoName: repo.name,
+              status: DiffStatus.error,
+              note: 'Missing ref resolution',
+            );
+          }
+
+          if (sourceRef.error != null || targetRef.error != null) {
+            return DiffResult(
+              repoId: repo.id,
+              repoName: repo.name,
+              status: DiffStatus.error,
+              note: sourceRef.error ?? targetRef.error,
+            );
+          }
+
+          return _getDiffForRepo(repo, sourceRef, targetRef);
+        }),
+      );
+      results.addAll(chunkResults);
     }
 
     return results;
