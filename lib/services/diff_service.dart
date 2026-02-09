@@ -75,32 +75,42 @@ class DiffService {
         );
       }
 
-      // Get commits between target and source
-      final commits = await client.getCommitsBetween(
+      // Single call to diffs/commits (like Streamlit): gives aheadCount (commit diff) and file list from same response
+      final diffData = await client.getDiffsCommits(
         repo.id,
         targetCommitId,
         sourceCommitId,
       );
+      final aheadCount = AzureDevOpsClient.aheadCountFromDiff(diffData);
+      final fileCount = AzureDevOpsClient.totalChangesFromDiff(diffData);
+      final files = AzureDevOpsClient.filePathsFromDiff(diffData);
 
-      // Get changed files
-      final files = await client.getChangedFiles(
-        repo.id,
-        targetCommitId,
-        sourceCommitId,
-      );
+      // Status from same source as Streamlit: aheadCount and file count from diffs/commits
+      final status = (aheadCount == 0 && fileCount == 0)
+          ? DiffStatus.aligned
+          : DiffStatus.divergent;
 
-      // Get commit details
+      // List of commit details for the expandable section (optional; may be empty on some servers)
+      List<Commit> commits = [];
+      if (aheadCount > 0) {
+        try {
+          commits = await client.getCommitsBetween(
+            repo.id,
+            targetCommitId,
+            sourceCommitId,
+          );
+        } catch (_) {}
+      }
+
       final sourceCommit = await client.getCommit(repo.id, sourceCommitId);
       final targetCommit = await client.getCommit(repo.id, targetCommitId);
-
-      final status = commits.isEmpty ? DiffStatus.aligned : DiffStatus.divergent;
 
       return DiffResult(
         repoId: repo.id,
         repoName: repo.name,
         status: status,
-        commitCount: commits.length,
-        fileCount: files.length,
+        commitCount: aheadCount,
+        fileCount: fileCount,
         sourceRef: sourceRef.refName,
         targetRef: targetRef.refName,
         sourceCommit: sourceCommitId,
@@ -114,8 +124,8 @@ class DiffService {
         commits: commits,
         files: files,
         note: status == DiffStatus.aligned
-            ? 'No differences'
-            : '${commits.length} commits ahead',
+            ? 'Nessuna differenza'
+            : '$aheadCount commit in SOURCE non in TARGET, $fileCount file modificati',
       );
     } catch (e) {
       return DiffResult(

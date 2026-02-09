@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/azure_models.dart';
 import '../providers/app_state.dart';
 
@@ -92,6 +93,17 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                               _showOnlyDivergent = value;
                             });
                           },
+                        ),
+                        const SizedBox(width: 16),
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            appState.clearDiffResults();
+                          },
+                          icon: const Icon(Icons.restore, size: 18),
+                          label: const Text('Ripristina'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Theme.of(context).colorScheme.error,
+                          ),
                         ),
                       ],
                     ),
@@ -291,19 +303,35 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                             const Divider(),
                                         itemBuilder: (context, index) {
                                           final commit = result.commits![index];
-                                          return ListTile(
-                                            dense: true,
-                                            title: Text(
-                                              commit.comment ?? '(nessun messaggio)',
-                                              style:
-                                                  const TextStyle(fontSize: 13),
-                                            ),
-                                            subtitle: Text(
-                                              '${commit.commitId.substring(0, 7)} - '
-                                              '${commit.author?.name ?? ""} - '
-                                              '${_formatDate(commit.date)}',
-                                              style:
-                                                  const TextStyle(fontSize: 11),
+                                          final shortId = commit.commitId.length >= 7
+                                              ? commit.commitId.substring(0, 7)
+                                              : commit.commitId;
+                                          final author = commit.author?.name ?? '';
+                                          final dateStr = _formatDate(commit.date);
+                                          final caption = [
+                                            shortId,
+                                            if (author.isNotEmpty) '— $author',
+                                            if (dateStr.isNotEmpty) '· $dateStr',
+                                          ].join(' ');
+                                          return Padding(
+                                            padding: const EdgeInsets.symmetric(vertical: 6),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  caption,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  commit.comment ?? '(nessun messaggio)',
+                                                  style: const TextStyle(fontSize: 13),
+                                                ),
+                                              ],
                                             ),
                                           );
                                         },
@@ -348,6 +376,21 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                   ],
                                 ),
                               ],
+                              
+                              // Link Apri Compare in Azure DevOps (come in Streamlit)
+                              if (result.repoId.isNotEmpty &&
+                                  appState.organization.isNotEmpty &&
+                                  appState.project.isNotEmpty) ...[
+                                const Divider(height: 24),
+                                _CompareLink(
+                                  baseUrl: appState.baseUrl,
+                                  organization: appState.organization,
+                                  project: appState.project,
+                                  repoName: result.repoName,
+                                  sourceRef: result.sourceRef,
+                                  targetRef: result.targetRef,
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -363,27 +406,153 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 16),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    columns: const [
-                      DataColumn(label: Text('Repo')),
-                      DataColumn(label: Text('Stato')),
-                      DataColumn(label: Text('Commit')),
-                      DataColumn(label: Text('File')),
-                      DataColumn(label: Text('SourceRef')),
-                      DataColumn(label: Text('TargetRef')),
-                    ],
-                    rows: results.map((r) {
-                      return DataRow(cells: [
-                        DataCell(Text(r.repoName)),
-                        DataCell(Text(_getStatusIcon(r.status))),
-                        DataCell(Text('${r.commitCount}')),
-                        DataCell(Text('${r.fileCount}')),
-                        DataCell(Text(r.sourceRef ?? '')),
-                        DataCell(Text(r.targetRef ?? '')),
-                      ]);
-                    }).toList(),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      headingRowHeight: 48,
+                      dataRowMinHeight: 44,
+                      dataRowMaxHeight: 52,
+                      columnSpacing: 24,
+                      horizontalMargin: 20,
+                      headingRowColor: WidgetStateProperty.all(
+                        Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
+                      ),
+                      columns: [
+                        DataColumn(
+                          label: Text(
+                            'Repo',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                        DataColumn(
+                          label: Text(
+                            'Stato',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                        DataColumn(
+                          label: Text(
+                            'Commit',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                        DataColumn(
+                          label: Text(
+                            'File',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                        DataColumn(
+                          label: Text(
+                            'SourceRef',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                        DataColumn(
+                          label: Text(
+                            'TargetRef',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                        DataColumn(
+                          label: Text(
+                            'Note',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                      ],
+                      rows: results.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final r = entry.value;
+                        final isEven = index.isEven;
+                        return DataRow(
+                          color: WidgetStateProperty.all(
+                            isEven
+                                ? Theme.of(context).colorScheme.surface
+                                : Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.4),
+                          ),
+                          cells: [
+                            DataCell(Text(
+                              r.repoName,
+                              style: const TextStyle(fontWeight: FontWeight.w500),
+                            )),
+                            DataCell(Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _getStatusIconData(r.status),
+                                  size: 18,
+                                  color: _getStatusColor(r.status, context),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(_getStatusIcon(r.status)),
+                              ],
+                            )),
+                            DataCell(Text('${r.commitCount}')),
+                            DataCell(Text('${r.fileCount}')),
+                            DataCell(Text(
+                              r.sourceRef ?? '—',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.85),
+                              ),
+                            )),
+                            DataCell(Text(
+                              r.targetRef ?? '—',
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 12,
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.85),
+                              ),
+                            )),
+                            DataCell(ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 220),
+                              child: Text(
+                                r.note ?? '—',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 2,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.85),
+                                ),
+                              ),
+                            )),
+                          ],
+                        );
+                      }).toList(),
+                    ),
                   ),
                 ),
               ],
@@ -407,6 +576,77 @@ class _InfoChip extends StatelessWidget {
       avatar: Icon(icon, size: 16),
       label: Text(label, style: const TextStyle(fontSize: 12)),
       padding: const EdgeInsets.symmetric(horizontal: 4),
+    );
+  }
+}
+
+/// Link "Apri Compare in Azure DevOps" come nella versione Streamlit
+class _CompareLink extends StatelessWidget {
+  final String baseUrl;
+  final String organization;
+  final String project;
+  final String repoName;
+  final String? sourceRef;
+  final String? targetRef;
+
+  const _CompareLink({
+    required this.baseUrl,
+    required this.organization,
+    required this.project,
+    required this.repoName,
+    this.sourceRef,
+    this.targetRef,
+  });
+
+  String get _compareUrl {
+    final webBase = baseUrl.trim().isEmpty
+        ? 'https://dev.azure.com'
+        : baseUrl.trim().replaceAll(RegExp(r'/$'), '');
+    final tRef = Uri.encodeComponent(targetRef ?? '');
+    final sRef = Uri.encodeComponent(sourceRef ?? '');
+    return '$webBase/$organization/$project/_git/${Uri.encodeComponent(repoName)}/branchCompare?baseVersion=$tRef&targetVersion=$sRef&_a=commits';
+  }
+
+  Future<void> _openCompare(BuildContext context) async {
+    final uri = Uri.parse(_compareUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Impossibile aprire: $_compareUrl')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => _openCompare(context),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.open_in_new,
+              size: 18,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Apri Compare in Azure DevOps',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w500,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

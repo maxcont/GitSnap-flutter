@@ -86,7 +86,7 @@ class AzureDevOpsClient {
     }
   }
 
-  /// Get tags for a repository
+  /// Get tags for a repository (refs with filter=tags/)
   Future<List<Map<String, dynamic>>> getTags(String repoId) async {
     final url = Uri.parse(
       '$_apiBase/git/repositories/$repoId/refs?filter=tags/&api-version=7.0',
@@ -102,10 +102,40 @@ class AzureDevOpsClient {
       }
 
       final data = json.decode(response.body);
-      return List<Map<String, dynamic>>.from(data['value']);
+      final value = data['value'] ?? data['refs'];
+      if (value == null) return [];
+      return List<Map<String, dynamic>>.from(value);
     } catch (e) {
       throw AzureDevOpsClientError('Error fetching tags: $e');
     }
+  }
+
+  /// Resolve a tag name to the commit it points to (for annotated tags the ref objectId is not the commit).
+  /// Returns commit map with commitId and date, or null if not found.
+  /// Tries api-version 7.0, 6.0, 5.0 for on-prem compatibility (like Streamlit).
+  Future<Map<String, dynamic>?> getCommitByTag(String repoId, String tagName) async {
+    const versions = ['7.0', '6.0', '5.0'];
+    for (final apiVersion in versions) {
+      final url = Uri.parse('$_apiBase/git/repositories/$repoId/commits').replace(
+        queryParameters: {
+          'api-version': apiVersion,
+          r'$top': '1',
+          'searchCriteria.itemVersion.version': tagName,
+          'searchCriteria.itemVersion.versionType': 'tag',
+        },
+      );
+      try {
+        final response = await http.get(url, headers: _headers);
+        if (response.statusCode != 200) continue;
+        final data = json.decode(response.body);
+        final list = data['value'] as List?;
+        if (list == null || list.isEmpty) continue;
+        return Map<String, dynamic>.from(list[0]);
+      } catch (_) {
+        continue;
+      }
+    }
+    return null;
   }
 
   /// Get commit details
@@ -129,78 +159,111 @@ class AzureDevOpsClient {
     }
   }
 
-  /// Get commits between two commits
+  /// Get commits in source not in target (same API as Streamlit: GET commits with itemVersion=source, compareVersion=target).
   Future<List<Commit>> getCommitsBetween(
     String repoId,
     String baseCommit,
     String targetCommit,
   ) async {
-    final url = Uri.parse(
-      '$_apiBase/git/repositories/$repoId/commitsBatch?api-version=7.0',
+    // baseCommit = TARGET, targetCommit = SOURCE → commits in SOURCE not in TARGET
+    final url = Uri.parse('$_apiBase/git/repositories/$repoId/commits').replace(
+      queryParameters: {
+        'api-version': '7.0',
+        r'$top': '250',
+        'searchCriteria.itemVersion.version': targetCommit,
+        'searchCriteria.itemVersion.versionType': 'commit',
+        'searchCriteria.compareVersion.version': baseCommit,
+        'searchCriteria.compareVersion.versionType': 'commit',
+      },
     );
 
-    final body = json.encode({
-      'itemVersion': {
-        'versionType': 'commit',
-        'version': targetCommit,
-      },
-      'compareVersion': {
-        'versionType': 'commit',
-        'version': baseCommit,
-      },
-    });
-
     try {
-      final response = await http.post(
-        url,
-        headers: _headers,
-        body: body,
-      );
-
+      final response = await http.get(url, headers: _headers);
       if (response.statusCode != 200) {
         throw AzureDevOpsClientError(
           'Failed to fetch commits: ${response.statusCode}',
         );
       }
-
       final data = json.decode(response.body);
-      final commitList = data['value'] as List;
-      
+      final commitList = data['value'] as List?;
+      if (commitList == null) return [];
       return commitList.map((c) => Commit.fromJson(c)).toList();
     } catch (e) {
       throw AzureDevOpsClientError('Error fetching commits: $e');
     }
   }
 
-  /// Get changed files between two commits
+  /// Result of diffs/commits API: commit count (aheadCount) and file list from the same response (like Streamlit).
+  static int aheadCountFromDiff(Map<String, dynamic> data) {
+    final v = data['aheadCount'];
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return 0;
+  }
+
+  static int totalChangesFromDiff(Map<String, dynamic> data) {
+    final changeCounts = data['changeCounts'];
+    if (changeCounts is Map) {
+      var sum = 0;
+      for (final v in changeCounts.values) {
+        if (v is int) sum += v;
+        if (v is num) sum += v.toInt();
+      }
+      return sum;
+    }
+    final changes = data['changes'] as List?;
+    return changes?.length ?? 0;
+  }
+
+  static List<String> filePathsFromDiff(Map<String, dynamic> data) {
+    final changes = data['changes'] as List?;
+    if (changes == null) return [];
+    return changes
+        .map((c) {
+          final item = c is Map ? c['item'] : null;
+          final path = item is Map ? (item['path'] ?? item['originalPath']) : null;
+          final p = path ?? (c is Map ? c['path'] : null);
+          return p is String ? p : null;
+        })
+        .where((p) => p != null && p.isNotEmpty)
+        .cast<String>()
+        .toList();
+  }
+
+  /// Single call to diffs/commits (base=TARGET, target=SOURCE). Returns full response so we use aheadCount for commit diff and status.
+  Future<Map<String, dynamic>> getDiffsCommits(
+    String repoId,
+    String baseCommit,
+    String targetCommit,
+  ) async {
+    final url = Uri.parse('$_apiBase/git/repositories/$repoId/diffs/commits').replace(
+      queryParameters: {
+        'api-version': '7.0',
+        'baseVersion': baseCommit,
+        'targetVersion': targetCommit,
+        'baseVersionType': 'commit',
+        'targetVersionType': 'commit',
+        r'$top': '500',
+      },
+    );
+    final response = await http.get(url, headers: _headers);
+    if (response.statusCode != 200) {
+      throw AzureDevOpsClientError('Diffs/commits failed: ${response.statusCode}');
+    }
+    final data = json.decode(response.body);
+    return Map<String, dynamic>.from(data);
+  }
+
+  /// Get changed files between two commits (base=TARGET, target=SOURCE). Kept for compatibility.
   Future<List<String>> getChangedFiles(
     String repoId,
     String baseCommit,
     String targetCommit,
   ) async {
-    final url = Uri.parse(
-      '$_apiBase/git/repositories/$repoId/diffs/commits?'
-      'baseVersion=$baseCommit&targetVersion=$targetCommit&api-version=7.0',
-    );
-
     try {
-      final response = await http.get(url, headers: _headers);
-
-      if (response.statusCode != 200) {
-        return [];
-      }
-
-      final data = json.decode(response.body);
-      final changes = data['changes'] as List?;
-      
-      if (changes == null) return [];
-
-      return changes
-          .map((c) => c['item']?['path'] as String?)
-          .where((p) => p != null)
-          .cast<String>()
-          .toList();
-    } catch (e) {
+      final data = await getDiffsCommits(repoId, baseCommit, targetCommit);
+      return AzureDevOpsClient.filePathsFromDiff(data);
+    } catch (_) {
       return [];
     }
   }

@@ -274,4 +274,10 @@ class AppState extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
   }
+
+  /// Svuota i risultati del confronto (ripristina: non vedere nulla).
+  void clearDiffResults() {
+    _diffResults = [];
+    notifyListeners();
+  }
 }

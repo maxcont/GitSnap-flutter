@@ -12,18 +12,26 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# macOS
+.DS_Store
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# IntelliJ / Android Studio
 *.iml
 *.ipr
 *.iws
 .idea/
+local.properties
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# VS Code (opzionale: decommenta per non versionare le impostazioni)
+# .vscode/
 
-# Flutter/Dart/Pub related
+# Flutter/Dart/Pub
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
@@ -33,13 +41,33 @@ migrate_working_dir/
 .pub/
 /build/
 
-# Symbolication related
+# Symbolication
 app.*.symbols
 
-# Obfuscation related
+# Obfuscation
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/.gradle/
+/android/captures/
+/android/gradle-wrapper.jar
+/android/key.properties
+*.jks
+
+# iOS/macOS
+/ios/Pods/
+/ios/.symlinks/
+/ios/Flutter/Flutter.framework
+/ios/Flutter/Flutter.podspec
+/macos/Flutter/ephemeral/
+
+# Coverage
+coverage/
+
+# Environment / secrets (non versionare chiavi o PAT)
+.env
+.env.*
+!.env.example

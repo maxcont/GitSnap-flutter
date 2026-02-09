@@ -15,6 +15,17 @@ class _ConfigPanelState extends State<ConfigPanel> {
   late TextEditingController _projectController;
   late TextEditingController _usernameController;
   late TextEditingController _patController;
+  String? _lastSyncedProjectId;
+
+  void _syncFromAppState(AppState appState) {
+    if (appState.currentProjectId == _lastSyncedProjectId) return;
+    _lastSyncedProjectId = appState.currentProjectId;
+    _baseUrlController.text = appState.baseUrl;
+    _orgController.text = appState.organization;
+    _projectController.text = appState.project;
+    _usernameController.text = appState.username;
+    _patController.text = appState.pat;
+  }
 
   @override
   void initState() {
@@ -25,6 +36,7 @@ class _ConfigPanelState extends State<ConfigPanel> {
     _projectController = TextEditingController(text: appState.project);
     _usernameController = TextEditingController(text: appState.username);
     _patController = TextEditingController(text: appState.pat);
+    _lastSyncedProjectId = appState.currentProjectId;
   }
 
   @override
@@ -39,6 +51,9 @@ class _ConfigPanelState extends State<ConfigPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
+    _syncFromAppState(appState);
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),

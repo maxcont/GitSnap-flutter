@@ -173,18 +173,40 @@ class _RefConfigPanelState extends State<RefConfigPanel> {
               ],
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                context.read<AppState>().runComparison();
+            Consumer<AppState>(
+              builder: (context, appState, _) {
+                final isLoading = appState.isLoading;
+                return Row(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: isLoading
+                          ? null
+                          : () {
+                              appState.runComparison();
+                            },
+                      icon: isLoading
+                          ? SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Theme.of(context).colorScheme.onPrimary,
+                              ),
+                            )
+                          : const Icon(Icons.compare_arrows),
+                      label: Text(
+                        isLoading ? 'Confronto in corso...' : 'Esegui confronto',
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 16,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
               },
-              icon: const Icon(Icons.compare_arrows),
-              label: const Text('Esegui confronto'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 16,
-                ),
-              ),
             ),
           ],
         ),
