@@ -389,104 +389,106 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 280),
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final filtered = _filteredDefinitions;
-                              return filtered.isEmpty
-                                  ? Center(
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(24),
-                                        child: Text(
-                                          _filterQuery.trim().isEmpty
-                                              ? 'Nessuna pipeline'
-                                              : 'Nessun risultato per "$_filterQuery"',
-                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                                              ),
-                                        ),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final filtered = _filteredDefinitions;
+                            final crossAxisCount = (constraints.maxWidth / 240).floor().clamp(2, 5);
+                            return filtered.isEmpty
+                                ? Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 24),
+                                    child: Center(
+                                      child: Text(
+                                        _filterQuery.trim().isEmpty
+                                            ? 'Nessuna pipeline'
+                                            : 'Nessun risultato per "$_filterQuery"',
+                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                            ),
                                       ),
-                                    )
-                                  : ListView.separated(
-                                      shrinkWrap: true,
-                                      itemCount: filtered.length,
-                                      separatorBuilder: (_, __) => const SizedBox(height: 4),
-                                      itemBuilder: (context, i) {
-                                        final d = filtered[i];
-                                        final isA = _selectedDefA?.id == d.id;
-                                        final isB = _selectedDefB?.id == d.id;
-                                        return Card(
-                                          margin: EdgeInsets.zero,
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                            child: Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      Text(
-                                                        d.name,
-                                                        style: Theme.of(context).textTheme.titleSmall,
-                                                        overflow: TextOverflow.ellipsis,
-                                                        maxLines: 1,
-                                                      ),
-                                                      const SizedBox(height: 2),
-                                                      Text(
-                                                        '${d.path ?? "—"} · #${d.id}',
-                                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                                                            ),
-                                                        overflow: TextOverflow.ellipsis,
-                                                        maxLines: 1,
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Row(
-                                                  mainAxisSize: MainAxisSize.min,
+                                    ),
+                                  )
+                                : GridView.builder(
+                                    shrinkWrap: true,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: crossAxisCount,
+                                      mainAxisExtent: 56,
+                                      crossAxisSpacing: 8,
+                                      mainAxisSpacing: 6,
+                                    ),
+                                    itemCount: filtered.length,
+                                    itemBuilder: (context, i) {
+                                      final d = filtered[i];
+                                      final isA = _selectedDefA?.id == d.id;
+                                      final isB = _selectedDefB?.id == d.id;
+                                      return Material(
+                                        color: (isA || isB)
+                                            ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.35)
+                                            : Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
                                                   children: [
-                                                    FilterChip(
-                                                      label: const Text('A'),
-                                                      selected: isA,
-                                                      onSelected: (v) {
-                                                        setState(() {
-                                                          _selectedDefA = v ? d : null;
-                                                          _revisionsA = [];
-                                                          _variablesA = {};
-                                                        });
-                                                        if (v) _loadRevisionsFor(appState, d.id, true);
-                                                      },
-                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-                                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                    Text(
+                                                      d.name,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      maxLines: 1,
+                                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
                                                     ),
-                                                    const SizedBox(width: 4),
-                                                    FilterChip(
-                                                      label: const Text('B'),
-                                                      selected: isB,
-                                                      onSelected: (v) {
-                                                        setState(() {
-                                                          _selectedDefB = v ? d : null;
-                                                          _revisionsB = [];
-                                                          _variablesB = {};
-                                                        });
-                                                        if (v) _loadRevisionsFor(appState, d.id, false);
-                                                      },
-                                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-                                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                    Text(
+                                                      '${d.path ?? "—"} · #${d.id}',
+                                                      overflow: TextOverflow.ellipsis,
+                                                      maxLines: 1,
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.65),
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
-                                              ],
-                                            ),
+                                              ),
+                                              FilterChip(
+                                                label: const Text('A'),
+                                                selected: isA,
+                                                onSelected: (v) {
+                                                  setState(() {
+                                                    _selectedDefA = v ? d : null;
+                                                    _revisionsA = [];
+                                                    _variablesA = {};
+                                                  });
+                                                  if (v) _loadRevisionsFor(appState, d.id, true);
+                                                },
+                                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
+                                              const SizedBox(width: 2),
+                                              FilterChip(
+                                                label: const Text('B'),
+                                                selected: isB,
+                                                onSelected: (v) {
+                                                  setState(() {
+                                                    _selectedDefB = v ? d : null;
+                                                    _revisionsB = [];
+                                                    _variablesB = {};
+                                                  });
+                                                  if (v) _loadRevisionsFor(appState, d.id, false);
+                                                },
+                                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
+                                            ],
                                           ),
-                                        );
-                                      },
-                                    );
-                                },
-                          ),
+                                        ),
+                                      );
+                                    },
+                                  );
+                          },
                         ),
                       ],
                     ],
