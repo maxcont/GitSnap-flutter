@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/azure_models.dart';
+import '../models/release_models.dart';
 
 class AzureDevOpsClientError implements Exception {
   final String message;
@@ -42,23 +43,39 @@ class AzureDevOpsClient {
     };
   }
 
+  static String _messageForStatus(int statusCode, String body) {
+    if (statusCode == 401) {
+      return '401 Non autorizzato. Verifica che il PAT (Personal Access Token) sia corretto, non scaduto, '
+          'e che l\'utente abbia accesso al progetto. Su Azure DevOps Server usa come username vuoto e PAT come password (Basic Auth).';
+    }
+    if (statusCode == 403) {
+      return '403 Accesso negato. Il PAT non ha i permessi necessari per questo progetto.';
+    }
+    if (body.length > 500 || body.trim().startsWith('<!')) {
+      return 'Errore HTTP $statusCode. Verifica connessione e credenziali.';
+    }
+    return body;
+  }
+
   /// Get all repositories
   Future<List<Repository>> getRepositories() async {
     final url = Uri.parse('$_apiBase/git/repositories?api-version=7.0');
-    
+
     try {
       final response = await http.get(url, headers: _headers);
-      
+
       if (response.statusCode != 200) {
         throw AzureDevOpsClientError(
-          'Failed to fetch repositories: ${response.statusCode} ${response.body}',
+          'Failed to fetch repositories: ${response.statusCode}. ${_messageForStatus(response.statusCode, response.body)}',
         );
       }
 
       final data = json.decode(response.body);
       final repoList = data['value'] as List;
-      
+
       return repoList.map((r) => Repository.fromJson(r)).toList();
+    } on AzureDevOpsClientError {
+      rethrow;
     } catch (e) {
       throw AzureDevOpsClientError('Error fetching repositories: $e');
     }
@@ -279,6 +296,127 @@ class AzureDevOpsClient {
       return true;
     } catch (e) {
       return false;
+    }
+  }
+
+  // ─── Release / Pipeline APIs ─────────────────────────────────────────────
+
+  String get _releaseBase => '$_apiBase/release';
+
+  /// List release definitions (pipelines), optionally filtered by folder path (e.g. "\\Esercizio")
+  Future<List<ReleaseDefinitionInfo>> getReleaseDefinitions({
+    String? path,
+    int top = 100,
+  }) async {
+    final q = <String, String>{
+      'api-version': '7.0',
+      r'$top': '$top',
+    };
+    if (path != null && path.isNotEmpty) q['path'] = path;
+    final url = Uri.parse('$_releaseBase/definitions').replace(queryParameters: q);
+    final response = await http.get(url, headers: _headers);
+    if (response.statusCode != 200) {
+      throw AzureDevOpsClientError('Release definitions: ${response.statusCode}');
+    }
+    final data = json.decode(response.body);
+    final list = data['value'] as List?;
+    if (list == null) return [];
+    return list.map((e) {
+      final m = Map<String, dynamic>.from(e);
+      return ReleaseDefinitionInfo(
+        id: (m['id'] as num).toInt(),
+        name: m['name'] as String? ?? '',
+        path: m['path'] as String?,
+      );
+    }).toList();
+  }
+
+  /// Revisions of a release definition (returns list of revision numbers)
+  Future<List<int>> getReleaseDefinitionRevisions(int definitionId) async {
+    final url = Uri.parse('$_releaseBase/definitions/$definitionId/revisions').replace(
+      queryParameters: {'api-version': '7.0'},
+    );
+    final response = await http.get(url, headers: _headers);
+    if (response.statusCode != 200) {
+      throw AzureDevOpsClientError('Revisions: ${response.statusCode}');
+    }
+    final data = json.decode(response.body);
+    final list = data['value'] as List?;
+    if (list == null) return [];
+    return list.map((e) {
+      final m = Map<String, dynamic>.from(e);
+      final n = m['revision'];
+      return n is int ? n : (n as num).toInt();
+    }).toList()..sort((a, b) => b.compareTo(a));
+  }
+
+  /// Get release definition at a specific revision (includes variables)
+  Future<Map<String, ReleaseVariable>> getVariablesAtRevision(
+    int definitionId,
+    int revision,
+  ) async {
+    final url = Uri.parse('$_releaseBase/definitions/$definitionId').replace(
+      queryParameters: {'api-version': '7.0', 'revision': '$revision'},
+    );
+    final response = await http.get(url, headers: _headers);
+    if (response.statusCode != 200) {
+      throw AzureDevOpsClientError('Definition revision: ${response.statusCode}');
+    }
+    final data = json.decode(response.body);
+    return _parseVariablesFromDefinition(data);
+  }
+
+  /// Latest variables via project _releaseDefinition endpoint (on-prem style)
+  Future<Map<String, ReleaseVariable>> getLatestVariables(int definitionId) async {
+    final base = baseUrl != null && baseUrl!.isNotEmpty
+        ? '${baseUrl!.trim()}/$organization/$project'
+        : 'https://dev.azure.com/$organization/$project';
+    final url = Uri.parse('$base/_releaseDefinition').replace(
+      queryParameters: {
+        'definitionId': '$definitionId',
+        '__rt': 'fps',
+        '__ver': '2',
+      },
+    );
+    final response = await http.get(url, headers: _headers);
+    if (response.statusCode != 200) {
+      throw AzureDevOpsClientError('Latest variables: ${response.statusCode}');
+    }
+    final data = json.decode(response.body);
+    if (data is! Map<String, dynamic>) return {};
+    return _parseVariablesFromDefinition(data);
+  }
+
+  /// Flatten variables from definition JSON (environments[].variables or root variables)
+  static Map<String, ReleaseVariable> _parseVariablesFromDefinition(Map<String, dynamic> data) {
+    final out = <String, ReleaseVariable>{};
+    final envs = data['environments'] as List?;
+    if (envs != null) {
+      for (final e in envs) {
+        final env = e is Map ? e as Map<String, dynamic> : null;
+        if (env == null) continue;
+        final vars = env['variables'] as Map?;
+        if (vars != null) _addVarsFromMap(vars, out);
+      }
+    }
+    final rootVars = data['variables'] as Map?;
+    if (rootVars != null) _addVarsFromMap(rootVars, out);
+    return out;
+  }
+
+  static void _addVarsFromMap(dynamic vars, Map<String, ReleaseVariable> out) {
+    final m = vars is Map ? vars as Map<String, dynamic> : null;
+    if (m == null) return;
+    for (final e in m.entries) {
+      final name = e.key as String;
+      dynamic v = e.value;
+      if (v is Map) {
+        final val = v['value']?.toString() ?? '';
+        final secret = v['isSecret'] == true;
+        out[name] = ReleaseVariable(name: name, value: val, isSecret: secret);
+      } else {
+        out[name] = ReleaseVariable(name: name, value: v?.toString() ?? '');
+      }
     }
   }
 }

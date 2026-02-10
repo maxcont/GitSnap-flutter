@@ -139,8 +139,13 @@ class AppState extends ChangeNotifier {
 
   // Load repositories
   Future<void> loadRepositories() async {
-    if (_organization.isEmpty || _project.isEmpty || _pat.isEmpty) {
-      _errorMessage = 'Please fill in all required fields';
+    if (_organization.isEmpty || _project.isEmpty) {
+      _errorMessage = 'Inserisci organizzazione e progetto.';
+      notifyListeners();
+      return;
+    }
+    if (_pat.isEmpty) {
+      _errorMessage = 'Inserisci il PAT (Personal Access Token) per autenticarti ad Azure DevOps.';
       notifyListeners();
       return;
     }
