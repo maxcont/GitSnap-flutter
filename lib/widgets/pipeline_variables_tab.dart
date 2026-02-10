@@ -30,6 +30,9 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
   bool _expandVariabiliA = true;
   bool _expandVariabiliB = true;
   bool _expandConfronto = true;
+  bool _varsPanelAFullHeight = false;
+  bool _varsPanelBFullHeight = false;
+  static const double _varsPanelFixedHeight = 500;
 
   /// "Tutte" = carica Sviluppo + Collaudo + Esercizio e unisci
   Future<void> _loadDefinitions(AppState appState, {String? path}) async {
@@ -531,32 +534,72 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                 ],
                               ],
                             ),
-                            if (_variablesA.isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              Text('Variabili A (${_variablesA.length})', style: Theme.of(context).textTheme.titleSmall),
-                              const SizedBox(height: 6),
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(maxHeight: 260),
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: DataTable(
-                                    columns: const [
-                                      DataColumn(label: Text('Nome')),
-                                      DataColumn(label: Text('Valore')),
-                                      DataColumn(label: Text('Secret')),
-                                    ],
-                                    rows: _variablesA.entries.map((e) {
-                                      return DataRow(
-                                        cells: [
-                                          DataCell(Text(e.key, style: const TextStyle(fontFamily: 'monospace'))),
-                                          DataCell(SelectableText(e.value.displayValue)),
-                                          DataCell(Text(e.value.isSecret ? 'Sì' : '')),
-                                        ],
-                                      );
-                                    }).toList(),
-                                  ),
+                          if (_variablesA.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Text('Variabili A (${_variablesA.length})', style: Theme.of(context).textTheme.titleSmall),
+                                const SizedBox(width: 12),
+                                IconButton(
+                                  icon: Icon(_varsPanelAFullHeight ? Icons.fullscreen_exit : Icons.fullscreen),
+                                  tooltip: _varsPanelAFullHeight ? 'Riduci altezza' : 'Espandi a tutta l\'altezza',
+                                  onPressed: () => setState(() => _varsPanelAFullHeight = !_varsPanelAFullHeight),
                                 ),
-                              ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            _varsPanelAFullHeight
+                                ? Scrollbar(
+                                    thumbVisibility: true,
+                                    child: SingleChildScrollView(
+                                      child: SingleChildScrollView(
+                                        scrollDirection: Axis.horizontal,
+                                        child: DataTable(
+                                          columns: const [
+                                            DataColumn(label: Text('Nome')),
+                                            DataColumn(label: Text('Valore')),
+                                            DataColumn(label: Text('Secret')),
+                                          ],
+                                          rows: _variablesA.entries.map((e) {
+                                            return DataRow(
+                                              cells: [
+                                                DataCell(Text(e.key, style: const TextStyle(fontFamily: 'monospace'))),
+                                                DataCell(SelectableText(e.value.displayValue)),
+                                                DataCell(Text(e.value.isSecret ? 'Sì' : '')),
+                                              ],
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : SizedBox(
+                                    height: _varsPanelFixedHeight,
+                                    child: Scrollbar(
+                                      thumbVisibility: true,
+                                      child: SingleChildScrollView(
+                                        child: SingleChildScrollView(
+                                          scrollDirection: Axis.horizontal,
+                                          child: DataTable(
+                                            columns: const [
+                                              DataColumn(label: Text('Nome')),
+                                              DataColumn(label: Text('Valore')),
+                                              DataColumn(label: Text('Secret')),
+                                            ],
+                                            rows: _variablesA.entries.map((e) {
+                                              return DataRow(
+                                                cells: [
+                                                  DataCell(Text(e.key, style: const TextStyle(fontFamily: 'monospace'))),
+                                                  DataCell(SelectableText(e.value.displayValue)),
+                                                  DataCell(Text(e.value.isSecret ? 'Sì' : '')),
+                                                ],
+                                              );
+                                            }).toList(),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                             ],
                           ],
                         ],
@@ -599,32 +642,72 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                 ],
                               ],
                             ),
-                            if (_variablesB.isNotEmpty) ...[
-                              const SizedBox(height: 12),
-                              Text('Variabili B (${_variablesB.length})', style: Theme.of(context).textTheme.titleSmall),
-                              const SizedBox(height: 6),
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(maxHeight: 260),
-                                child: SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: DataTable(
-                                    columns: const [
-                                      DataColumn(label: Text('Nome')),
-                                      DataColumn(label: Text('Valore')),
-                                      DataColumn(label: Text('Secret')),
-                                    ],
-                                    rows: _variablesB.entries.map((e) {
-                                      return DataRow(
-                                        cells: [
-                                          DataCell(Text(e.key, style: const TextStyle(fontFamily: 'monospace'))),
-                                          DataCell(SelectableText(e.value.displayValue)),
-                                          DataCell(Text(e.value.isSecret ? 'Sì' : '')),
-                                        ],
-                                      );
-                                    }).toList(),
-                                  ),
+                          if (_variablesB.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Text('Variabili B (${_variablesB.length})', style: Theme.of(context).textTheme.titleSmall),
+                                const SizedBox(width: 12),
+                                IconButton(
+                                  icon: Icon(_varsPanelBFullHeight ? Icons.fullscreen_exit : Icons.fullscreen),
+                                  tooltip: _varsPanelBFullHeight ? 'Riduci altezza' : 'Espandi a tutta l\'altezza',
+                                  onPressed: () => setState(() => _varsPanelBFullHeight = !_varsPanelBFullHeight),
                                 ),
-                              ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            _varsPanelBFullHeight
+                                ? Scrollbar(
+                                    thumbVisibility: true,
+                                    child: SingleChildScrollView(
+                                      child: SingleChildScrollView(
+                                        scrollDirection: Axis.horizontal,
+                                        child: DataTable(
+                                          columns: const [
+                                            DataColumn(label: Text('Nome')),
+                                            DataColumn(label: Text('Valore')),
+                                            DataColumn(label: Text('Secret')),
+                                          ],
+                                          rows: _variablesB.entries.map((e) {
+                                            return DataRow(
+                                              cells: [
+                                                DataCell(Text(e.key, style: const TextStyle(fontFamily: 'monospace'))),
+                                                DataCell(SelectableText(e.value.displayValue)),
+                                                DataCell(Text(e.value.isSecret ? 'Sì' : '')),
+                                              ],
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : SizedBox(
+                                    height: _varsPanelFixedHeight,
+                                    child: Scrollbar(
+                                      thumbVisibility: true,
+                                      child: SingleChildScrollView(
+                                        child: SingleChildScrollView(
+                                          scrollDirection: Axis.horizontal,
+                                          child: DataTable(
+                                            columns: const [
+                                              DataColumn(label: Text('Nome')),
+                                              DataColumn(label: Text('Valore')),
+                                              DataColumn(label: Text('Secret')),
+                                            ],
+                                            rows: _variablesB.entries.map((e) {
+                                              return DataRow(
+                                                cells: [
+                                                  DataCell(Text(e.key, style: const TextStyle(fontFamily: 'monospace'))),
+                                                  DataCell(SelectableText(e.value.displayValue)),
+                                                  DataCell(Text(e.value.isSecret ? 'Sì' : '')),
+                                                ],
+                                              );
+                                            }).toList(),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                             ],
                           ],
                         ],
@@ -664,9 +747,7 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                               final onlyA = diff.where((e) => e.onlyInA).length;
                               final onlyB = diff.where((e) => e.onlyInB).length;
                               final different = diff.where((e) => e.different).length;
-                              const colNomeWidth = 180.0;
-                              const colValoreWidth = 220.0;
-                              const colStatoWidth = 90.0;
+                              final screenWidth = MediaQuery.of(context).size.width;
                               return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -681,12 +762,18 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                   const SizedBox(height: 12),
                                   SingleChildScrollView(
                                     scrollDirection: Axis.horizontal,
-                                    child: Table(
-                                      columnWidths: const {
-                                        0: FixedColumnWidth(colNomeWidth),
-                                        1: FixedColumnWidth(colValoreWidth),
-                                        2: FixedColumnWidth(colValoreWidth),
-                                        3: FixedColumnWidth(colStatoWidth),
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        // Usa tutta la larghezza disponibile del pannello,
+                                        // ma consenti comunque di allargare con lo scroll orizzontale se serve.
+                                        minWidth: screenWidth - 96, // 16 padding esterno + 16 interno card * 2 circa
+                                      ),
+                                      child: Table(
+                                      columnWidths: const <int, TableColumnWidth>{
+                                        0: FlexColumnWidth(1),
+                                        1: FlexColumnWidth(2),
+                                        2: FlexColumnWidth(2),
+                                        3: FlexColumnWidth(1),
                                       },
                                       border: TableBorder.all(
                                         color: Theme.of(context).dividerColor,
@@ -744,6 +831,7 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                         }),
                                       ],
                                     ),
+                                  ),
                                   ),
                                 ],
                               );
