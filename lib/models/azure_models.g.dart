@@ -25,7 +25,7 @@ Map<String, dynamic> _$ProjectConfigToJson(ProjectConfig instance) =>
       'project': instance.project,
       'baseUrl': instance.baseUrl,
       'username': instance.username,
-      // PAT is intentionally omitted from serialization
+      'pat': instance.pat,
     };
 
 Repository _$RepositoryFromJson(Map<String, dynamic> json) => Repository(

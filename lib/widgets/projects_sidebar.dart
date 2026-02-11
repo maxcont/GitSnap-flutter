@@ -20,6 +20,7 @@ class _ProjectsSidebarState extends State<ProjectsSidebar> {
   final _usernameController = TextEditingController();
   final _patController = TextEditingController();
   bool _showAddForm = false;
+  String? _editingProjectId;
 
   @override
   void dispose() {
@@ -41,11 +42,20 @@ class _ProjectsSidebarState extends State<ProjectsSidebar> {
     _patController.clear();
   }
 
-  void _addProject(AppState appState) {
+  void _fillFormFromProject(ProjectConfig project) {
+    _nameController.text = project.name;
+    _baseUrlController.text = project.baseUrl ?? '';
+    _orgController.text = project.organization;
+    _projectController.text = project.project;
+    _usernameController.text = project.username ?? '';
+    _patController.text = project.pat ?? '';
+  }
+
+  void _saveProject(AppState appState) {
     if (_formKey.currentState!.validate()) {
-      final uuid = const Uuid();
+      final isEditing = _editingProjectId != null;
       final project = ProjectConfig(
-        id: uuid.v4().substring(0, 8),
+        id: isEditing ? _editingProjectId! : const Uuid().v4().substring(0, 8),
         name: _nameController.text.isNotEmpty
             ? _nameController.text
             : '${_orgController.text}/${_projectController.text}',
@@ -60,15 +70,22 @@ class _ProjectsSidebarState extends State<ProjectsSidebar> {
         pat: _patController.text.isNotEmpty ? _patController.text : null,
       );
 
-      appState.addProject(project);
+      if (isEditing) {
+        appState.updateProject(project);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Progetto aggiornato')),
+        );
+      } else {
+        appState.addProject(project);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Progetto salvato')),
+        );
+      }
       _clearForm();
       setState(() {
         _showAddForm = false;
+        _editingProjectId = null;
       });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Progetto salvato')),
-      );
     }
   }
 
@@ -163,6 +180,15 @@ class _ProjectsSidebarState extends State<ProjectsSidebar> {
                                     },
                                   ),
                                   IconButton(
+                                    icon: const Icon(Icons.edit_outlined),
+                                    tooltip: 'Modifica progetto',
+                                    onPressed: () {
+                                      _editingProjectId = project.id;
+                                      _fillFormFromProject(project);
+                                      setState(() => _showAddForm = true);
+                                    },
+                                  ),
+                                  IconButton(
                                     icon: const Icon(Icons.delete),
                                     tooltip: 'Elimina progetto',
                                     onPressed: () {
@@ -215,9 +241,9 @@ class _ProjectsSidebarState extends State<ProjectsSidebar> {
                     padding: const EdgeInsets.all(16),
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        setState(() {
-                          _showAddForm = true;
-                        });
+                        _editingProjectId = null;
+                        _clearForm();
+                        setState(() => _showAddForm = true);
                       },
                       icon: const Icon(Icons.add),
                       label: const Text('Aggiungi progetto'),
@@ -236,7 +262,15 @@ class _ProjectsSidebarState extends State<ProjectsSidebar> {
                       key: _formKey,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Text(
+                            _editingProjectId != null
+                                ? 'Modifica progetto'
+                                : 'Nuovo progetto',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 12),
                           TextFormField(
                             controller: _nameController,
                             decoration: const InputDecoration(
@@ -302,7 +336,7 @@ class _ProjectsSidebarState extends State<ProjectsSidebar> {
                           TextFormField(
                             controller: _patController,
                             decoration: const InputDecoration(
-                              labelText: 'PAT (opzionale, salvato nel file)',
+                              labelText: 'PAT (opzionale, salvato con il progetto)',
                               border: OutlineInputBorder(),
                             ),
                             obscureText: true,
@@ -316,14 +350,19 @@ class _ProjectsSidebarState extends State<ProjectsSidebar> {
                                   _clearForm();
                                   setState(() {
                                     _showAddForm = false;
+                                    _editingProjectId = null;
                                   });
                                 },
                                 child: const Text('Annulla'),
                               ),
                               const SizedBox(width: 8),
                               ElevatedButton(
-                                onPressed: () => _addProject(appState),
-                                child: const Text('Salva progetto'),
+                                onPressed: () => _saveProject(appState),
+                                child: Text(
+                                  _editingProjectId != null
+                                      ? 'Aggiorna progetto'
+                                      : 'Salva progetto',
+                                ),
                               ),
                             ],
                           ),

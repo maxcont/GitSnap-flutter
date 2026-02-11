@@ -256,6 +256,15 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateProject(ProjectConfig project) async {
+    final index = _projects.indexWhere((p) => p.id == project.id);
+    if (index >= 0) {
+      _projects[index] = project;
+      await _storage.saveProjects(_projects);
+      notifyListeners();
+    }
+  }
+
   Future<void> deleteProject(String projectId) async {
     _projects.removeWhere((p) => p.id == projectId);
     await _storage.saveProjects(_projects);

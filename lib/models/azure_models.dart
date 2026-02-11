@@ -11,7 +11,7 @@ class ProjectConfig {
   final String project;
   final String? baseUrl;
   final String? username;
-  final String? pat; // Not persisted in file
+  final String? pat;
 
   ProjectConfig({
     required this.id,
