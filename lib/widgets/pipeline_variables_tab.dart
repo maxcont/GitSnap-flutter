@@ -32,6 +32,7 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
   bool _expandConfronto = true;
   bool _varsPanelAFullHeight = false;
   bool _varsPanelBFullHeight = false;
+  bool _singlePanelFullWidth = false;
   Set<String> _selectedScopesA = {};
   Set<String> _selectedScopesB = {};
   static const double _varsPanelFixedHeight = 500;
@@ -56,6 +57,7 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
       _variablesB = {};
       _selectedScopesA = {};
       _selectedScopesB = {};
+      _singlePanelFullWidth = false;
     });
     try {
       List<ReleaseDefinitionInfo> list;
@@ -334,34 +336,100 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     );
   }
 
-  Widget _variablesTable(List<ReleaseVariable> variables, {required bool fullHeight}) {
-    final table = DataTable(
-      columns: _variableTableColumns,
-      rows: _variableRows(variables),
-    );
-    if (fullHeight) {
-      return Scrollbar(
-        thumbVisibility: true,
-        child: SingleChildScrollView(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: table,
-          ),
+  bool get _isSinglePipelineView =>
+      (_selectedDefA != null) != (_selectedDefB != null);
+
+  Widget _variablesToolbar(
+    BuildContext context, {
+    required String countLabel,
+    required bool fullHeight,
+    required VoidCallback onToggleHeight,
+    bool showWidthToggle = false,
+    bool fullWidth = false,
+    VoidCallback? onToggleWidth,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(countLabel, style: Theme.of(context).textTheme.titleSmall),
         ),
+        if (showWidthToggle && onToggleWidth != null)
+          IconButton(
+            icon: Icon(fullWidth ? Icons.view_column : Icons.width_wide),
+            tooltip: fullWidth ? 'Ripristina larghezza' : 'Espandi in larghezza',
+            onPressed: onToggleWidth,
+          ),
+        IconButton(
+          icon: Icon(fullHeight ? Icons.fullscreen_exit : Icons.fullscreen),
+          tooltip: fullHeight ? 'Riduci altezza' : 'Espandi a tutta l\'altezza',
+          onPressed: onToggleHeight,
+        ),
+      ],
+    );
+  }
+
+  static List<DataColumn> _variableTableColumnsFor(double? width) {
+    if (width == null) {
+      return const [
+        DataColumn(label: Text('Nome')),
+        DataColumn(label: Text('Valore')),
+        DataColumn(label: Text('Ambito')),
+      ];
+    }
+    return [
+      DataColumn(
+        label: const Text('Nome'),
+        columnWidth: FixedColumnWidth(width * 0.20),
+      ),
+      DataColumn(
+        label: const Text('Valore'),
+        columnWidth: FixedColumnWidth(width * 0.55),
+      ),
+      DataColumn(
+        label: const Text('Ambito'),
+        columnWidth: FixedColumnWidth(width * 0.25),
+      ),
+    ];
+  }
+
+  Widget _variablesTable(
+    List<ReleaseVariable> variables, {
+    required bool fullHeight,
+    bool fullWidth = false,
+  }) {
+    Widget buildTable(double? width) {
+      final table = DataTable(
+        columnSpacing: fullWidth ? 20 : 56,
+        horizontalMargin: fullWidth ? 12 : 24,
+        columns: _variableTableColumnsFor(width),
+        rows: _variableRows(variables),
+      );
+      if (width != null) {
+        return ConstrainedBox(
+          constraints: BoxConstraints(minWidth: width),
+          child: table,
+        );
+      }
+      return table;
+    }
+
+    Widget buildScroller(Widget table) {
+      return _ScrolledVariablesTable(
+        fullHeight: fullHeight,
+        height: _varsPanelFixedHeight,
+        child: table,
       );
     }
-    return SizedBox(
-      height: _varsPanelFixedHeight,
-      child: Scrollbar(
-        thumbVisibility: true,
-        child: SingleChildScrollView(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: table,
-          ),
-        ),
-      ),
-    );
+
+    if (fullWidth) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth.isFinite ? constraints.maxWidth : null;
+          return buildScroller(buildTable(width));
+        },
+      );
+    }
+    return buildScroller(buildTable(null));
   }
 
   static List<ReleaseVariable> _sortedVariables(Map<String, ReleaseVariable> vars) {
@@ -431,19 +499,19 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     }).toList();
   }
 
-  static const _variableTableColumns = [
-    DataColumn(label: Text('Nome')),
-    DataColumn(label: Text('Valore')),
-    DataColumn(label: Text('Ambito')),
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, appState, _) {
         final hasClient = appState.client != null;
+        final wideSinglePanel = _isSinglePipelineView && _singlePanelFullWidth;
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.fromLTRB(
+            wideSinglePanel ? 8 : 16,
+            16,
+            wideSinglePanel ? 8 : 16,
+            16,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -640,6 +708,7 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                                     _revisionsA = [];
                                                     _variablesA = {};
                                                     _selectedScopesA = {};
+                                                    if (!_isSinglePipelineView) _singlePanelFullWidth = false;
                                                   });
                                                   if (v) _loadRevisionsFor(appState, d.id, true);
                                                 },
@@ -656,6 +725,7 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                                     _revisionsB = [];
                                                     _variablesB = {};
                                                     _selectedScopesB = {};
+                                                    if (!_isSinglePipelineView) _singlePanelFullWidth = false;
                                                   });
                                                   if (v) _loadRevisionsFor(appState, d.id, false);
                                                 },
@@ -725,24 +795,20 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                               onChanged: (scopes) => setState(() => _selectedScopesA = scopes),
                             ),
                             const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Text(
-                                  _variablesCountLabel('Variabili A', _variablesA, _selectedScopesA),
-                                  style: Theme.of(context).textTheme.titleSmall,
-                                ),
-                                const SizedBox(width: 12),
-                                IconButton(
-                                  icon: Icon(_varsPanelAFullHeight ? Icons.fullscreen_exit : Icons.fullscreen),
-                                  tooltip: _varsPanelAFullHeight ? 'Riduci altezza' : 'Espandi a tutta l\'altezza',
-                                  onPressed: () => setState(() => _varsPanelAFullHeight = !_varsPanelAFullHeight),
-                                ),
-                              ],
+                            _variablesToolbar(
+                              context,
+                              countLabel: _variablesCountLabel('Variabili A', _variablesA, _selectedScopesA),
+                              fullHeight: _varsPanelAFullHeight,
+                              onToggleHeight: () => setState(() => _varsPanelAFullHeight = !_varsPanelAFullHeight),
+                              showWidthToggle: _isSinglePipelineView && _selectedDefA != null,
+                              fullWidth: _singlePanelFullWidth,
+                              onToggleWidth: () => setState(() => _singlePanelFullWidth = !_singlePanelFullWidth),
                             ),
                             const SizedBox(height: 6),
                             _variablesTable(
                               _filteredVariables(_variablesA, _selectedScopesA),
                               fullHeight: _varsPanelAFullHeight,
+                              fullWidth: _isSinglePipelineView && _singlePanelFullWidth,
                             ),
                             ],
                           ],
@@ -795,30 +861,34 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                               onChanged: (scopes) => setState(() => _selectedScopesB = scopes),
                             ),
                             const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Text(
-                                  _variablesCountLabel('Variabili B', _variablesB, _selectedScopesB),
-                                  style: Theme.of(context).textTheme.titleSmall,
-                                ),
-                                const SizedBox(width: 12),
-                                IconButton(
-                                  icon: Icon(_varsPanelBFullHeight ? Icons.fullscreen_exit : Icons.fullscreen),
-                                  tooltip: _varsPanelBFullHeight ? 'Riduci altezza' : 'Espandi a tutta l\'altezza',
-                                  onPressed: () => setState(() => _varsPanelBFullHeight = !_varsPanelBFullHeight),
-                                ),
-                              ],
+                            _variablesToolbar(
+                              context,
+                              countLabel: _variablesCountLabel('Variabili B', _variablesB, _selectedScopesB),
+                              fullHeight: _varsPanelBFullHeight,
+                              onToggleHeight: () => setState(() => _varsPanelBFullHeight = !_varsPanelBFullHeight),
+                              showWidthToggle: _isSinglePipelineView && _selectedDefB != null,
+                              fullWidth: _singlePanelFullWidth,
+                              onToggleWidth: () => setState(() => _singlePanelFullWidth = !_singlePanelFullWidth),
                             ),
                             const SizedBox(height: 6),
                             _variablesTable(
                               _filteredVariables(_variablesB, _selectedScopesB),
                               fullHeight: _varsPanelBFullHeight,
+                              fullWidth: _isSinglePipelineView && _singlePanelFullWidth,
                             ),
                             ],
                           ],
                         ],
                       ),
                     );
+                    final onlyA = _selectedDefA != null && _selectedDefB == null;
+                    final onlyB = _selectedDefB != null && _selectedDefA == null;
+                    if (onlyA) {
+                      return panelA;
+                    }
+                    if (onlyB) {
+                      return panelB;
+                    }
                     if (sideBySide) {
                       return Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -957,6 +1027,76 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
           ),
         );
       },
+    );
+  }
+}
+
+class _ScrolledVariablesTable extends StatefulWidget {
+  const _ScrolledVariablesTable({
+    required this.child,
+    required this.fullHeight,
+    required this.height,
+  });
+
+  final Widget child;
+  final bool fullHeight;
+  final double height;
+
+  @override
+  State<_ScrolledVariablesTable> createState() => _ScrolledVariablesTableState();
+}
+
+class _ScrolledVariablesTableState extends State<_ScrolledVariablesTable> {
+  late final ScrollController _verticalController;
+  late final ScrollController _horizontalController;
+
+  @override
+  void initState() {
+    super.initState();
+    _verticalController = ScrollController();
+    _horizontalController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _verticalController.dispose();
+    _horizontalController.dispose();
+    super.dispose();
+  }
+
+  Widget _horizontalScroll() {
+    return SingleChildScrollView(
+      controller: _horizontalController,
+      scrollDirection: Axis.horizontal,
+      child: widget.child,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.fullHeight) {
+      return Scrollbar(
+        controller: _horizontalController,
+        thumbVisibility: true,
+        child: _horizontalScroll(),
+      );
+    }
+
+    return SizedBox(
+      height: widget.height,
+      child: Scrollbar(
+        controller: _verticalController,
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+          controller: _verticalController,
+          child: Scrollbar(
+            controller: _horizontalController,
+            thumbVisibility: true,
+            notificationPredicate: (notification) => notification.metrics.axis == Axis.horizontal,
+            child: _horizontalScroll(),
+          ),
+        ),
+      ),
     );
   }
 }
