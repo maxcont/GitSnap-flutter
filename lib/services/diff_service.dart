@@ -98,41 +98,77 @@ class DiffService {
         );
       }
 
-      // Single call to diffs/commits (like Streamlit): gives aheadCount (commit diff) and file list from same response
-      final diffData = await client.getDiffsCommits(
+      // base=TARGET, target=SOURCE → aheadCount: SOURCE not in TARGET, behindCount: TARGET not in SOURCE
+      final diffSourceNotInTarget = await client.getDiffsCommits(
         repo.id,
         targetCommitId,
         sourceCommitId,
       );
-      final aheadCount = AzureDevOpsClient.aheadCountFromDiff(diffData);
-      final fileCount = AzureDevOpsClient.totalChangesFromDiff(diffData);
-      final files = AzureDevOpsClient.filePathsFromDiff(diffData);
+      final diffTargetNotInSource = targetCommitId != sourceCommitId
+          ? await client.getDiffsCommits(
+              repo.id,
+              sourceCommitId,
+              targetCommitId,
+            )
+          : diffSourceNotInTarget;
 
-      // Status from same source as Streamlit: aheadCount and file count from diffs/commits
-      final status = (aheadCount == 0 && fileCount == 0)
+      final sourceAheadCount =
+          AzureDevOpsClient.aheadCountFromDiff(diffSourceNotInTarget);
+      final targetAheadCount =
+          AzureDevOpsClient.behindCountFromDiff(diffSourceNotInTarget);
+
+      final fileCountA =
+          AzureDevOpsClient.totalChangesFromDiff(diffSourceNotInTarget);
+      final fileCountB =
+          AzureDevOpsClient.totalChangesFromDiff(diffTargetNotInSource);
+      final fileCount = fileCountA > fileCountB ? fileCountA : fileCountB;
+
+      final filesA = AzureDevOpsClient.filePathsFromDiff(diffSourceNotInTarget);
+      final filesB = AzureDevOpsClient.filePathsFromDiff(diffTargetNotInSource);
+      final files = {...filesA, ...filesB}.toList()..sort();
+
+      final status = (sourceAheadCount == 0 &&
+              targetAheadCount == 0 &&
+              fileCount == 0)
           ? DiffStatus.aligned
           : DiffStatus.divergent;
 
-      // List of commit details for the expandable section (optional; may be empty on some servers)
-      List<Commit> commits = [];
-      if (aheadCount > 0) {
-        try {
-          commits = await client.getCommitsBetween(
-            repo.id,
-            targetCommitId,
-            sourceCommitId,
+      List<Commit> commitsOnlyInSource = [];
+      List<Commit> commitsOnlyInTarget = [];
+      try {
+        final commitFetches = <Future<void>>[];
+        if (sourceAheadCount > 0) {
+          commitFetches.add(
+            client
+                .getCommitsBetween(repo.id, targetCommitId, sourceCommitId)
+                .then((list) => commitsOnlyInSource = list),
           );
-        } catch (_) {}
+        }
+        if (targetAheadCount > 0) {
+          commitFetches.add(
+            client
+                .getCommitsBetween(repo.id, sourceCommitId, targetCommitId)
+                .then((list) => commitsOnlyInTarget = list),
+          );
+        }
+        if (commitFetches.isNotEmpty) {
+          await Future.wait(commitFetches);
+        }
+      } catch (_) {
+        // optional details: ignore
       }
 
       final sourceCommit = await client.getCommit(repo.id, sourceCommitId);
       final targetCommit = await client.getCommit(repo.id, targetCommitId);
 
+      final totalCommitDiff = sourceAheadCount + targetAheadCount;
       return DiffResult(
         repoId: repo.id,
         repoName: repo.name,
         status: status,
-        commitCount: aheadCount,
+        commitCount: totalCommitDiff,
+        sourceOnlyCommitCount: sourceAheadCount,
+        targetOnlyCommitCount: targetAheadCount,
         fileCount: fileCount,
         sourceRef: sourceRef.refName,
         targetRef: targetRef.refName,
@@ -144,11 +180,12 @@ class DiffService {
         targetCommitAuthor: targetCommit['author']?['name'],
         sourceCommitDate: sourceCommit['author']?['date'],
         targetCommitDate: targetCommit['author']?['date'],
-        commits: commits,
+        commits: commitsOnlyInSource.isEmpty ? null : commitsOnlyInSource,
+        targetCommits: commitsOnlyInTarget.isEmpty ? null : commitsOnlyInTarget,
         files: files,
         note: status == DiffStatus.aligned
             ? 'Nessuna differenza'
-            : '$aheadCount commit in SOURCE non in TARGET, $fileCount file modificati',
+            : 'SOURCE→TARGET: $sourceAheadCount commit, TARGET→SOURCE: $targetAheadCount commit, $fileCount file modificati',
       );
     } catch (e) {
       return DiffResult(

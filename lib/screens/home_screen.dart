@@ -22,8 +22,8 @@ class HomeScreen extends StatelessWidget {
               const Text('🔄 GitSnap – Confronto Ambienti'),
               const SizedBox(width: 16),
               Text(
-                '· by Massimo Contursi',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                '·  M.Contursi',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                     ),
               ),
@@ -155,7 +155,7 @@ class _ComparisonTab extends StatelessWidget {
               const SizedBox(height: 32),
               Center(
                 child: Text(
-                  'GitSnap · by Massimo Contursi',
+                  'GitSnap · by M.Contursi',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context)
                             .colorScheme

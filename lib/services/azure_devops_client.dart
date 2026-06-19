@@ -176,20 +176,20 @@ class AzureDevOpsClient {
     }
   }
 
-  /// Get commits in source not in target (same API as Streamlit: GET commits with itemVersion=source, compareVersion=target).
+  /// Commits reachable from [tipCommit] that are not in [baseCommit].
   Future<List<Commit>> getCommitsBetween(
     String repoId,
     String baseCommit,
-    String targetCommit,
+    String tipCommit,
   ) async {
-    // baseCommit = TARGET, targetCommit = SOURCE → commits in SOURCE not in TARGET
+    // Azure returns commits in compareVersion not in itemVersion.
     final url = Uri.parse('$_apiBase/git/repositories/$repoId/commits').replace(
       queryParameters: {
         'api-version': '7.0',
         r'$top': '250',
-        'searchCriteria.itemVersion.version': targetCommit,
+        'searchCriteria.itemVersion.version': baseCommit,
         'searchCriteria.itemVersion.versionType': 'commit',
-        'searchCriteria.compareVersion.version': baseCommit,
+        'searchCriteria.compareVersion.version': tipCommit,
         'searchCriteria.compareVersion.versionType': 'commit',
       },
     );
@@ -213,6 +213,14 @@ class AzureDevOpsClient {
   /// Result of diffs/commits API: commit count (aheadCount) and file list from the same response (like Streamlit).
   static int aheadCountFromDiff(Map<String, dynamic> data) {
     final v = data['aheadCount'];
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return 0;
+  }
+
+  /// Commits in baseVersion not in targetVersion (inverse of [aheadCountFromDiff]).
+  static int behindCountFromDiff(Map<String, dynamic> data) {
+    final v = data['behindCount'];
     if (v is int) return v;
     if (v is num) return v.toInt();
     return 0;

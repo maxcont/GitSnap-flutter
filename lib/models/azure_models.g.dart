@@ -75,6 +75,8 @@ DiffResult _$DiffResultFromJson(Map<String, dynamic> json) => DiffResult(
       repoName: json['repoName'] as String,
       status: $enumDecode(_$DiffStatusEnumMap, json['status']),
       commitCount: json['commitCount'] as int? ?? 0,
+      sourceOnlyCommitCount: json['sourceOnlyCommitCount'] as int? ?? 0,
+      targetOnlyCommitCount: json['targetOnlyCommitCount'] as int? ?? 0,
       fileCount: json['fileCount'] as int? ?? 0,
       sourceRef: json['sourceRef'] as String?,
       targetRef: json['targetRef'] as String?,
@@ -89,6 +91,9 @@ DiffResult _$DiffResultFromJson(Map<String, dynamic> json) => DiffResult(
       commits: (json['commits'] as List<dynamic>?)
           ?.map((e) => Commit.fromJson(e as Map<String, dynamic>))
           .toList(),
+      targetCommits: (json['targetCommits'] as List<dynamic>?)
+          ?.map((e) => Commit.fromJson(e as Map<String, dynamic>))
+          .toList(),
       files:
           (json['files'] as List<dynamic>?)?.map((e) => e as String).toList(),
       note: json['note'] as String?,
@@ -100,6 +105,8 @@ Map<String, dynamic> _$DiffResultToJson(DiffResult instance) =>
       'repoName': instance.repoName,
       'status': _$DiffStatusEnumMap[instance.status]!,
       'commitCount': instance.commitCount,
+      'sourceOnlyCommitCount': instance.sourceOnlyCommitCount,
+      'targetOnlyCommitCount': instance.targetOnlyCommitCount,
       'fileCount': instance.fileCount,
       'sourceRef': instance.sourceRef,
       'targetRef': instance.targetRef,
@@ -112,6 +119,7 @@ Map<String, dynamic> _$DiffResultToJson(DiffResult instance) =>
       'sourceCommitDate': instance.sourceCommitDate,
       'targetCommitDate': instance.targetCommitDate,
       'commits': instance.commits,
+      'targetCommits': instance.targetCommits,
       'files': instance.files,
       'note': instance.note,
     };

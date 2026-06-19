@@ -284,60 +284,27 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                 ),
                               ],
                               
-                              // Commits list
+                              // Commits only in SOURCE
                               if (result.commits != null &&
                                   result.commits!.isNotEmpty) ...[
                                 const Divider(height: 24),
-                                ExpansionTile(
-                                  title: Text(
-                                    'Commit (SOURCE non in TARGET) (${result.commits!.length})',
-                                  ),
-                                  children: [
-                                    Container(
-                                      constraints:
-                                          const BoxConstraints(maxHeight: 300),
-                                      child: ListView.separated(
-                                        shrinkWrap: true,
-                                        itemCount: result.commits!.length,
-                                        separatorBuilder: (context, index) =>
-                                            const Divider(),
-                                        itemBuilder: (context, index) {
-                                          final commit = result.commits![index];
-                                          final shortId = commit.commitId.length >= 7
-                                              ? commit.commitId.substring(0, 7)
-                                              : commit.commitId;
-                                          final author = commit.author?.name ?? '';
-                                          final dateStr = _formatDate(commit.date);
-                                          final caption = [
-                                            shortId,
-                                            if (author.isNotEmpty) '— $author',
-                                            if (dateStr.isNotEmpty) '· $dateStr',
-                                          ].join(' ');
-                                          return Padding(
-                                            padding: const EdgeInsets.symmetric(vertical: 6),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  caption,
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-                                                    fontStyle: FontStyle.italic,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  commit.comment ?? '(nessun messaggio)',
-                                                  style: const TextStyle(fontSize: 13),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ],
+                                _CommitsExpansionTile(
+                                  title:
+                                      'Commit in SOURCE non in TARGET (${result.sourceOnlyCommitCount})',
+                                  commits: result.commits!,
+                                  formatDate: _formatDate,
+                                ),
+                              ],
+
+                              // Commits only in TARGET
+                              if (result.targetCommits != null &&
+                                  result.targetCommits!.isNotEmpty) ...[
+                                const Divider(height: 24),
+                                _CommitsExpansionTile(
+                                  title:
+                                      'Commit in TARGET non in SOURCE (${result.targetOnlyCommitCount})',
+                                  commits: result.targetCommits!,
+                                  formatDate: _formatDate,
                                 ),
                               ],
                               
@@ -560,6 +527,72 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
           ),
         );
       },
+    );
+  }
+}
+
+class _CommitsExpansionTile extends StatelessWidget {
+  final String title;
+  final List<Commit> commits;
+  final String Function(String?) formatDate;
+
+  const _CommitsExpansionTile({
+    required this.title,
+    required this.commits,
+    required this.formatDate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      title: Text(title),
+      children: [
+        Container(
+          constraints: const BoxConstraints(maxHeight: 300),
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: commits.length,
+            separatorBuilder: (context, index) => const Divider(),
+            itemBuilder: (context, index) {
+              final commit = commits[index];
+              final shortId = commit.commitId.length >= 7
+                  ? commit.commitId.substring(0, 7)
+                  : commit.commitId;
+              final author = commit.author?.name ?? '';
+              final dateStr = formatDate(commit.date);
+              final caption = [
+                shortId,
+                if (author.isNotEmpty) '— $author',
+                if (dateStr.isNotEmpty) '· $dateStr',
+              ].join(' ');
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      caption,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.7),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      commit.comment ?? '(nessun messaggio)',
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

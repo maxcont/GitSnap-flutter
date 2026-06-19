@@ -140,6 +140,8 @@ class DiffResult {
   final String repoName;
   final DiffStatus status;
   final int commitCount;
+  final int sourceOnlyCommitCount;
+  final int targetOnlyCommitCount;
   final int fileCount;
   final String? sourceRef;
   final String? targetRef;
@@ -152,6 +154,7 @@ class DiffResult {
   final String? sourceCommitDate;
   final String? targetCommitDate;
   final List<Commit>? commits;
+  final List<Commit>? targetCommits;
   final List<String>? files;
   final String? note;
 
@@ -160,6 +163,8 @@ class DiffResult {
     required this.repoName,
     required this.status,
     this.commitCount = 0,
+    this.sourceOnlyCommitCount = 0,
+    this.targetOnlyCommitCount = 0,
     this.fileCount = 0,
     this.sourceRef,
     this.targetRef,
@@ -172,6 +177,7 @@ class DiffResult {
     this.sourceCommitDate,
     this.targetCommitDate,
     this.commits,
+    this.targetCommits,
     this.files,
     this.note,
   });
