@@ -293,6 +293,8 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                       'Commit in SOURCE non in TARGET (${result.sourceOnlyCommitCount})',
                                   commits: result.commits!,
                                   formatDate: _formatDate,
+                                  accentColor: Theme.of(context).colorScheme.primary,
+                                  icon: Icons.north_east,
                                 ),
                               ],
 
@@ -305,6 +307,8 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                       'Commit in TARGET non in SOURCE (${result.targetOnlyCommitCount})',
                                   commits: result.targetCommits!,
                                   formatDate: _formatDate,
+                                  accentColor: Theme.of(context).colorScheme.secondary,
+                                  icon: Icons.south_west,
                                 ),
                               ],
                               
@@ -535,64 +539,101 @@ class _CommitsExpansionTile extends StatelessWidget {
   final String title;
   final List<Commit> commits;
   final String Function(String?) formatDate;
+  final Color accentColor;
+  final IconData icon;
 
   const _CommitsExpansionTile({
     required this.title,
     required this.commits,
     required this.formatDate,
+    required this.accentColor,
+    required this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ExpansionTile(
-      title: Text(title),
-      children: [
-        Container(
-          constraints: const BoxConstraints(maxHeight: 300),
-          child: ListView.separated(
-            shrinkWrap: true,
-            itemCount: commits.length,
-            separatorBuilder: (context, index) => const Divider(),
-            itemBuilder: (context, index) {
-              final commit = commits[index];
-              final shortId = commit.commitId.length >= 7
-                  ? commit.commitId.substring(0, 7)
-                  : commit.commitId;
-              final author = commit.author?.name ?? '';
-              final dateStr = formatDate(commit.date);
-              final caption = [
-                shortId,
-                if (author.isNotEmpty) '— $author',
-                if (dateStr.isNotEmpty) '· $dateStr',
-              ].join(' ');
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      caption,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withOpacity(0.7),
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      commit.comment ?? '(nessun messaggio)',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                  ],
-                ),
-              );
-            },
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        childrenPadding: EdgeInsets.zero,
+        backgroundColor: accentColor.withOpacity(0.08),
+        collapsedBackgroundColor: accentColor.withOpacity(0.16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        leading: Icon(icon, color: accentColor, size: 20),
+        title: Text(
+          title,
+          style: theme.textTheme.titleSmall?.copyWith(
+            color: accentColor,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
           ),
         ),
-      ],
+        children: [
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface.withOpacity(0.65),
+              border: Border(
+                top: BorderSide(color: accentColor.withOpacity(0.25)),
+              ),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+            ),
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 300),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: commits.length,
+                separatorBuilder: (context, index) => Divider(
+                  height: 1,
+                  color: theme.colorScheme.outline.withOpacity(0.15),
+                ),
+                itemBuilder: (context, index) {
+                  final commit = commits[index];
+                  final shortId = commit.commitId.length >= 7
+                      ? commit.commitId.substring(0, 7)
+                      : commit.commitId;
+                  final author = commit.author?.name ?? '';
+                  final dateStr = formatDate(commit.date);
+                  final caption = [
+                    shortId,
+                    if (author.isNotEmpty) '— $author',
+                    if (dateStr.isNotEmpty) '· $dateStr',
+                  ].join(' ');
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          caption,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: theme.colorScheme.onSurface.withOpacity(0.55),
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          commit.comment ?? '(nessun messaggio)',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w400,
+                            color: theme.colorScheme.onSurface.withOpacity(0.9),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

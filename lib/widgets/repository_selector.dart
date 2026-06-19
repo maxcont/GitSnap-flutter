@@ -15,6 +15,14 @@ class RepositorySelector extends StatefulWidget {
 class _RepositorySelectorState extends State<RepositorySelector> {
   bool _expanded = true;
   _RepoSortOrder _sortOrder = _RepoSortOrder.aToZ;
+  final TextEditingController _filterController = TextEditingController();
+  String _filterQuery = '';
+
+  @override
+  void dispose() {
+    _filterController.dispose();
+    super.dispose();
+  }
 
   List<Repository> _sortedRepositories(List<Repository> repos) {
     final list = List<Repository>.from(repos);
@@ -24,11 +32,27 @@ class _RepositorySelectorState extends State<RepositorySelector> {
     return list;
   }
 
+  List<Repository> _filteredRepositories(List<Repository> repos) {
+    final q = _filterQuery.trim().toLowerCase();
+    if (q.isEmpty) return repos;
+    return repos.where((repo) {
+      return repo.name.toLowerCase().contains(q) ||
+          (repo.defaultBranch ?? '').toLowerCase().contains(q) ||
+          repo.id.toLowerCase().contains(q);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, appState, child) {
         final sorted = _sortedRepositories(appState.repositories);
+        final filtered = _filteredRepositories(sorted);
+        final selectedInView =
+            filtered.where((r) => appState.selectedRepoIds.contains(r.id)).length;
+        final countLabel = _filterQuery.trim().isEmpty
+            ? '${appState.repositories.length} repository · ${appState.selectedRepoIds.length} selezionati'
+            : '${filtered.length} di ${appState.repositories.length} · $selectedInView selezionati visibili';
 
         return Card(
           child: Column(
@@ -50,7 +74,7 @@ class _RepositorySelectorState extends State<RepositorySelector> {
                       ),
                       const Spacer(),
                       Text(
-                        '${appState.repositories.length} repository · ${appState.selectedRepoIds.length} selezionati',
+                        countLabel,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                             ),
@@ -100,8 +124,44 @@ class _RepositorySelectorState extends State<RepositorySelector> {
                         ],
                       ),
                       const SizedBox(height: 12),
+                      TextField(
+                        controller: _filterController,
+                        decoration: InputDecoration(
+                          hintText: 'Filtra per nome, branch default o ID…',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          suffixIcon: _filterQuery.trim().isEmpty
+                              ? null
+                              : IconButton(
+                                  icon: const Icon(Icons.clear, size: 18),
+                                  onPressed: () {
+                                    _filterController.clear();
+                                    setState(() => _filterQuery = '');
+                                  },
+                                ),
+                        ),
+                        onChanged: (value) => setState(() => _filterQuery = value),
+                      ),
+                      const SizedBox(height: 12),
                       LayoutBuilder(
                         builder: (context, constraints) {
+                          if (filtered.isEmpty) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 24),
+                              child: Center(
+                                child: Text(
+                                  _filterQuery.trim().isEmpty
+                                      ? 'Nessun repository'
+                                      : 'Nessun risultato per "$_filterQuery"',
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                      ),
+                                ),
+                              ),
+                            );
+                          }
                           final crossAxisCount = (constraints.maxWidth / 260).floor().clamp(2, 5);
                           return GridView.builder(
                             shrinkWrap: true,
@@ -112,9 +172,9 @@ class _RepositorySelectorState extends State<RepositorySelector> {
                               crossAxisSpacing: 8,
                               mainAxisSpacing: 4,
                             ),
-                            itemCount: sorted.length,
+                            itemCount: filtered.length,
                             itemBuilder: (context, index) {
-                              final repo = sorted[index];
+                              final repo = filtered[index];
                               final isSelected = appState.selectedRepoIds.contains(repo.id);
 
                               return Material(
