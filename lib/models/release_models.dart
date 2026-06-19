@@ -11,24 +11,35 @@ class ReleaseDefinitionInfo {
   });
 }
 
-/// Single variable (name, value, secret flag)
+/// Single variable (name, value, secret flag, scope/ambito)
 class ReleaseVariable {
+  /// Azure UI label for pipeline-level variables (root `variables` block).
+  static const releaseScope = 'Versione';
+
   final String name;
   final String value;
   final bool isSecret;
+  final String scope;
 
   ReleaseVariable({
     required this.name,
     required this.value,
     this.isSecret = false,
+    this.scope = releaseScope,
   });
 
   String get displayValue => isSecret ? '********' : value;
+
+  /// Unique key when the same name exists in different scopes.
+  String get mapKey => releaseVariableKey(scope, name);
+
+  static String releaseVariableKey(String scope, String name) => '$scope\x00$name';
 }
 
 /// Two variable sets diff for comparison
 class VariableDiffEntry {
   final String name;
+  final String scope;
   final String? valueA;
   final String? valueB;
   final bool onlyInA;
@@ -37,6 +48,7 @@ class VariableDiffEntry {
 
   VariableDiffEntry({
     required this.name,
+    required this.scope,
     this.valueA,
     this.valueB,
     this.onlyInA = false,

@@ -32,6 +32,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
   bool _expandConfronto = true;
   bool _varsPanelAFullHeight = false;
   bool _varsPanelBFullHeight = false;
+  Set<String> _selectedScopesA = {};
+  Set<String> _selectedScopesB = {};
   static const double _varsPanelFixedHeight = 500;
 
   /// "Tutte" = carica Sviluppo + Collaudo + Esercizio e unisci
@@ -52,6 +54,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
       _selectedRevB = null;
       _variablesA = {};
       _variablesB = {};
+      _selectedScopesA = {};
+      _selectedScopesB = {};
     });
     try {
       List<ReleaseDefinitionInfo> list;
@@ -126,6 +130,7 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
         _useLatestA = latest;
         _revisionA = revision;
         _loadingVars = false;
+        _selectedScopesA = vars.values.map((v) => v.scope).toSet();
       });
     } catch (e) {
       setState(() {
@@ -148,6 +153,7 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
         _useLatestB = latest;
         _revisionB = revision;
         _loadingVars = false;
+        _selectedScopesB = vars.values.map((v) => v.scope).toSet();
       });
     } catch (e) {
       setState(() {
@@ -235,29 +241,201 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     }).toList();
   }
 
+  static List<String> _sortedScopesFor(Map<String, ReleaseVariable> vars) {
+    final scopes = vars.values.map((v) => v.scope).toSet().toList()
+      ..sort((a, b) {
+        if (a == ReleaseVariable.releaseScope) return -1;
+        if (b == ReleaseVariable.releaseScope) return 1;
+        return a.compareTo(b);
+      });
+    return scopes;
+  }
+
+  List<ReleaseVariable> _filteredVariables(
+    Map<String, ReleaseVariable> vars,
+    Set<String> selectedScopes,
+  ) {
+    final sorted = _sortedVariables(vars);
+    final allScopes = _sortedScopesFor(vars);
+    if (allScopes.isEmpty) return sorted;
+    if (selectedScopes.length >= allScopes.length) return sorted;
+    if (selectedScopes.isEmpty) return [];
+    return sorted.where((v) => selectedScopes.contains(v.scope)).toList();
+  }
+
+  List<VariableDiffEntry> _filteredDiffForComparison(List<VariableDiffEntry> diff) {
+    final scopesA = _sortedScopesFor(_variablesA).toSet();
+    final scopesB = _sortedScopesFor(_variablesB).toSet();
+    final visibleA = _selectedScopesA.length >= scopesA.length ? scopesA : _selectedScopesA;
+    final visibleB = _selectedScopesB.length >= scopesB.length ? scopesB : _selectedScopesB;
+    final visibleScopes = {...visibleA, ...visibleB};
+    if (visibleScopes.isEmpty) return [];
+    return diff.where((e) => visibleScopes.contains(e.scope)).toList();
+  }
+
+  String _scopeSelectorSummary(List<String> scopes, Set<String> selected) {
+    if (scopes.isEmpty) return '—';
+    if (selected.length >= scopes.length) return 'Tutti (${scopes.length})';
+    if (selected.isEmpty) return 'Nessuno selezionato';
+    if (selected.length == 1) return selected.first;
+    return '${selected.length} di ${scopes.length} selezionati';
+  }
+
+  Future<void> _openScopeSelector({
+    required BuildContext context,
+    required List<String> scopes,
+    required Set<String> selectedScopes,
+    required ValueChanged<Set<String>> onChanged,
+  }) async {
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (ctx) => _ScopeSelectDialog(
+        scopes: scopes,
+        initialSelected: selectedScopes.isEmpty ? scopes.toSet() : selectedScopes,
+      ),
+    );
+    if (result != null) onChanged(result);
+  }
+
+  Widget _scopeMultiSelect({
+    required BuildContext context,
+    required List<String> scopes,
+    required Set<String> selectedScopes,
+    required ValueChanged<Set<String>> onChanged,
+  }) {
+    if (scopes.isEmpty) return const SizedBox.shrink();
+
+    return SizedBox(
+      width: double.infinity,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Filtra per ambito',
+          border: const OutlineInputBorder(),
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          suffixIcon: const Icon(Icons.arrow_drop_down),
+        ),
+        child: InkWell(
+          onTap: () => _openScopeSelector(
+            context: context,
+            scopes: scopes,
+            selectedScopes: selectedScopes,
+            onChanged: onChanged,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              _scopeSelectorSummary(scopes, selectedScopes),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _variablesTable(List<ReleaseVariable> variables, {required bool fullHeight}) {
+    final table = DataTable(
+      columns: _variableTableColumns,
+      rows: _variableRows(variables),
+    );
+    if (fullHeight) {
+      return Scrollbar(
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: table,
+          ),
+        ),
+      );
+    }
+    return SizedBox(
+      height: _varsPanelFixedHeight,
+      child: Scrollbar(
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: table,
+          ),
+        ),
+      ),
+    );
+  }
+
+  static List<ReleaseVariable> _sortedVariables(Map<String, ReleaseVariable> vars) {
+    final list = vars.values.toList()
+      ..sort((a, b) {
+        final byName = a.name.compareTo(b.name);
+        if (byName != 0) return byName;
+        return a.scope.compareTo(b.scope);
+      });
+    return list;
+  }
+
   static List<VariableDiffEntry> _computeDiff(
     Map<String, ReleaseVariable> a,
     Map<String, ReleaseVariable> b,
   ) {
-    final names = <String>{...a.keys, ...b.keys};
-    return names.map((name) {
-      final va = a[name];
-      final vb = b[name];
+    final keys = <String>{...a.keys, ...b.keys};
+    return keys.map((key) {
+      final va = a[key];
+      final vb = b[key];
+      final name = va?.name ?? vb!.name;
+      final scope = va?.scope ?? vb!.scope;
       if (va == null) {
-        return VariableDiffEntry(name: name, valueB: vb?.value, onlyInB: true);
+        return VariableDiffEntry(name: name, scope: scope, valueB: vb?.value, onlyInB: true);
       }
       if (vb == null) {
-        return VariableDiffEntry(name: name, valueA: va.value, onlyInA: true);
+        return VariableDiffEntry(name: name, scope: scope, valueA: va.value, onlyInA: true);
       }
       return VariableDiffEntry(
         name: name,
+        scope: scope,
         valueA: va.value,
         valueB: vb.value,
         different: va.value != vb.value,
       );
     }).toList()
-      ..sort((x, y) => x.name.compareTo(y.name));
+      ..sort((x, y) {
+        final byName = x.name.compareTo(y.name);
+        if (byName != 0) return byName;
+        return x.scope.compareTo(y.scope);
+      });
   }
+
+  String _variablesCountLabel(
+    String label,
+    Map<String, ReleaseVariable> vars,
+    Set<String> selectedScopes,
+  ) {
+    final filtered = _filteredVariables(vars, selectedScopes).length;
+    final total = vars.length;
+    final allScopes = _sortedScopesFor(vars);
+    if (selectedScopes.length >= allScopes.length || filtered == total) {
+      return '$label ($total)';
+    }
+    return '$label ($filtered di $total)';
+  }
+
+  static List<DataRow> _variableRows(List<ReleaseVariable> variables) {
+    return variables.map((v) {
+      return DataRow(
+        cells: [
+          DataCell(Text(v.name, style: const TextStyle(fontFamily: 'monospace'))),
+          DataCell(SelectableText(v.displayValue)),
+          DataCell(Text(v.scope)),
+        ],
+      );
+    }).toList();
+  }
+
+  static const _variableTableColumns = [
+    DataColumn(label: Text('Nome')),
+    DataColumn(label: Text('Valore')),
+    DataColumn(label: Text('Ambito')),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -461,6 +639,7 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                                     _selectedDefA = v ? d : null;
                                                     _revisionsA = [];
                                                     _variablesA = {};
+                                                    _selectedScopesA = {};
                                                   });
                                                   if (v) _loadRevisionsFor(appState, d.id, true);
                                                 },
@@ -476,6 +655,7 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                                     _selectedDefB = v ? d : null;
                                                     _revisionsB = [];
                                                     _variablesB = {};
+                                                    _selectedScopesB = {};
                                                   });
                                                   if (v) _loadRevisionsFor(appState, d.id, false);
                                                 },
@@ -538,9 +718,19 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                             ),
                           if (_variablesA.isNotEmpty) ...[
                             const SizedBox(height: 12),
+                            _scopeMultiSelect(
+                              context: context,
+                              scopes: _sortedScopesFor(_variablesA),
+                              selectedScopes: _selectedScopesA,
+                              onChanged: (scopes) => setState(() => _selectedScopesA = scopes),
+                            ),
+                            const SizedBox(height: 12),
                             Row(
                               children: [
-                                Text('Variabili A (${_variablesA.length})', style: Theme.of(context).textTheme.titleSmall),
+                                Text(
+                                  _variablesCountLabel('Variabili A', _variablesA, _selectedScopesA),
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
                                 const SizedBox(width: 12),
                                 IconButton(
                                   icon: Icon(_varsPanelAFullHeight ? Icons.fullscreen_exit : Icons.fullscreen),
@@ -550,58 +740,10 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                               ],
                             ),
                             const SizedBox(height: 6),
-                            _varsPanelAFullHeight
-                                ? Scrollbar(
-                                    thumbVisibility: true,
-                                    child: SingleChildScrollView(
-                                      child: SingleChildScrollView(
-                                        scrollDirection: Axis.horizontal,
-                                        child: DataTable(
-                                          columns: const [
-                                            DataColumn(label: Text('Nome')),
-                                            DataColumn(label: Text('Valore')),
-                                            DataColumn(label: Text('Secret')),
-                                          ],
-                                          rows: _variablesA.entries.map((e) {
-                                            return DataRow(
-                                              cells: [
-                                                DataCell(Text(e.key, style: const TextStyle(fontFamily: 'monospace'))),
-                                                DataCell(SelectableText(e.value.displayValue)),
-                                                DataCell(Text(e.value.isSecret ? 'Sì' : '')),
-                                              ],
-                                            );
-                                          }).toList(),
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : SizedBox(
-                                    height: _varsPanelFixedHeight,
-                                    child: Scrollbar(
-                                      thumbVisibility: true,
-                                      child: SingleChildScrollView(
-                                        child: SingleChildScrollView(
-                                          scrollDirection: Axis.horizontal,
-                                          child: DataTable(
-                                            columns: const [
-                                              DataColumn(label: Text('Nome')),
-                                              DataColumn(label: Text('Valore')),
-                                              DataColumn(label: Text('Secret')),
-                                            ],
-                                            rows: _variablesA.entries.map((e) {
-                                              return DataRow(
-                                                cells: [
-                                                  DataCell(Text(e.key, style: const TextStyle(fontFamily: 'monospace'))),
-                                                  DataCell(SelectableText(e.value.displayValue)),
-                                                  DataCell(Text(e.value.isSecret ? 'Sì' : '')),
-                                                ],
-                                              );
-                                            }).toList(),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                            _variablesTable(
+                              _filteredVariables(_variablesA, _selectedScopesA),
+                              fullHeight: _varsPanelAFullHeight,
+                            ),
                             ],
                           ],
                         ],
@@ -646,9 +788,19 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                             ),
                           if (_variablesB.isNotEmpty) ...[
                             const SizedBox(height: 12),
+                            _scopeMultiSelect(
+                              context: context,
+                              scopes: _sortedScopesFor(_variablesB),
+                              selectedScopes: _selectedScopesB,
+                              onChanged: (scopes) => setState(() => _selectedScopesB = scopes),
+                            ),
+                            const SizedBox(height: 12),
                             Row(
                               children: [
-                                Text('Variabili B (${_variablesB.length})', style: Theme.of(context).textTheme.titleSmall),
+                                Text(
+                                  _variablesCountLabel('Variabili B', _variablesB, _selectedScopesB),
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
                                 const SizedBox(width: 12),
                                 IconButton(
                                   icon: Icon(_varsPanelBFullHeight ? Icons.fullscreen_exit : Icons.fullscreen),
@@ -658,58 +810,10 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                               ],
                             ),
                             const SizedBox(height: 6),
-                            _varsPanelBFullHeight
-                                ? Scrollbar(
-                                    thumbVisibility: true,
-                                    child: SingleChildScrollView(
-                                      child: SingleChildScrollView(
-                                        scrollDirection: Axis.horizontal,
-                                        child: DataTable(
-                                          columns: const [
-                                            DataColumn(label: Text('Nome')),
-                                            DataColumn(label: Text('Valore')),
-                                            DataColumn(label: Text('Secret')),
-                                          ],
-                                          rows: _variablesB.entries.map((e) {
-                                            return DataRow(
-                                              cells: [
-                                                DataCell(Text(e.key, style: const TextStyle(fontFamily: 'monospace'))),
-                                                DataCell(SelectableText(e.value.displayValue)),
-                                                DataCell(Text(e.value.isSecret ? 'Sì' : '')),
-                                              ],
-                                            );
-                                          }).toList(),
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : SizedBox(
-                                    height: _varsPanelFixedHeight,
-                                    child: Scrollbar(
-                                      thumbVisibility: true,
-                                      child: SingleChildScrollView(
-                                        child: SingleChildScrollView(
-                                          scrollDirection: Axis.horizontal,
-                                          child: DataTable(
-                                            columns: const [
-                                              DataColumn(label: Text('Nome')),
-                                              DataColumn(label: Text('Valore')),
-                                              DataColumn(label: Text('Secret')),
-                                            ],
-                                            rows: _variablesB.entries.map((e) {
-                                              return DataRow(
-                                                cells: [
-                                                  DataCell(Text(e.key, style: const TextStyle(fontFamily: 'monospace'))),
-                                                  DataCell(SelectableText(e.value.displayValue)),
-                                                  DataCell(Text(e.value.isSecret ? 'Sì' : '')),
-                                                ],
-                                              );
-                                            }).toList(),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                            _variablesTable(
+                              _filteredVariables(_variablesB, _selectedScopesB),
+                              fullHeight: _varsPanelBFullHeight,
+                            ),
                             ],
                           ],
                         ],
@@ -745,7 +849,7 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                   onToggle: () => setState(() => _expandConfronto = !_expandConfronto),
                   child: Builder(
                             builder: (context) {
-                              final diff = _computeDiff(_variablesA, _variablesB);
+                              final diff = _filteredDiffForComparison(_computeDiff(_variablesA, _variablesB));
                               final onlyA = diff.where((e) => e.onlyInA).length;
                               final onlyB = diff.where((e) => e.onlyInB).length;
                               final different = diff.where((e) => e.different).length;
@@ -775,7 +879,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                         0: FlexColumnWidth(1),
                                         1: FlexColumnWidth(2),
                                         2: FlexColumnWidth(2),
-                                        3: FlexColumnWidth(1),
+                                        3: FlexColumnWidth(1.5),
+                                        4: FlexColumnWidth(1),
                                       },
                                       border: TableBorder.all(
                                         color: Theme.of(context).dividerColor,
@@ -791,6 +896,7 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                             _pad(const Text('Nome', style: TextStyle(fontWeight: FontWeight.w600))),
                                             _pad(const Text('Valore A', style: TextStyle(fontWeight: FontWeight.w600))),
                                             _pad(const Text('Valore B', style: TextStyle(fontWeight: FontWeight.w600))),
+                                            _pad(const Text('Ambito', style: TextStyle(fontWeight: FontWeight.w600))),
                                             _pad(const Text('Stato', style: TextStyle(fontWeight: FontWeight.w600))),
                                           ],
                                         ),
@@ -827,6 +933,11 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                                 maxLines: 4,
                                                 style: const TextStyle(fontSize: 12),
                                               )),
+                                              _pad(SelectableText(
+                                                e.scope,
+                                                maxLines: 3,
+                                                style: const TextStyle(fontSize: 12),
+                                              )),
                                               _pad(Text(state, style: const TextStyle(fontSize: 12))),
                                             ],
                                           );
@@ -846,6 +957,105 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
           ),
         );
       },
+    );
+  }
+}
+
+class _ScopeSelectDialog extends StatefulWidget {
+  const _ScopeSelectDialog({
+    required this.scopes,
+    required this.initialSelected,
+  });
+
+  final List<String> scopes;
+  final Set<String> initialSelected;
+
+  @override
+  State<_ScopeSelectDialog> createState() => _ScopeSelectDialogState();
+}
+
+class _ScopeSelectDialogState extends State<_ScopeSelectDialog> {
+  late Set<String> _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = {...widget.initialSelected};
+  }
+
+  void _toggleAll(bool selectAll) {
+    setState(() {
+      _selected = selectAll ? widget.scopes.toSet() : {};
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allSelected = _selected.length >= widget.scopes.length;
+    final noneSelected = _selected.isEmpty;
+    final bool? selectAllValue = allSelected
+        ? true
+        : noneSelected
+            ? false
+            : null;
+    final listHeight = (widget.scopes.length * 48.0).clamp(96.0, 320.0);
+
+    return AlertDialog(
+      title: const Text('Seleziona ambiti'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Seleziona tutti', style: TextStyle(fontWeight: FontWeight.w600)),
+              value: selectAllValue,
+              tristate: true,
+              onChanged: (value) {
+                if (value == true) {
+                  _toggleAll(true);
+                } else {
+                  _toggleAll(false);
+                }
+              },
+            ),
+            const Divider(height: 1),
+            SizedBox(
+              height: listHeight,
+              child: ListView(
+                children: widget.scopes.map((scope) {
+                  return CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(scope),
+                    value: _selected.contains(scope),
+                    onChanged: (checked) {
+                      setState(() {
+                        if (checked == true) {
+                          _selected.add(scope);
+                        } else {
+                          _selected.remove(scope);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Annulla'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _selected),
+          child: const Text('Applica'),
+        ),
+      ],
     );
   }
 }

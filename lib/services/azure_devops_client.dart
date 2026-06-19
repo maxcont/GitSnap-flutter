@@ -395,36 +395,49 @@ class AzureDevOpsClient {
     return _parseVariablesFromDefinition(data);
   }
 
-  /// Flatten variables from definition JSON (environments[].variables or root variables)
-  static Map<String, ReleaseVariable> _parseVariablesFromDefinition(Map<String, dynamic> data) {
+  /// Flatten variables from definition JSON (environments[].variables or root variables).
+  /// Keys include scope so the same name in different environments is preserved.
+  static Map<String, ReleaseVariable> parseVariablesFromDefinition(Map<String, dynamic> data) {
     final out = <String, ReleaseVariable>{};
     final envs = data['environments'] as List?;
     if (envs != null) {
       for (final e in envs) {
         final env = e is Map ? e as Map<String, dynamic> : null;
         if (env == null) continue;
+        final scope = env['name'] as String? ?? 'Environment';
         final vars = env['variables'] as Map?;
-        if (vars != null) _addVarsFromMap(vars, out);
+        if (vars != null) _addVarsFromMap(vars, out, scope: scope);
       }
     }
     final rootVars = data['variables'] as Map?;
-    if (rootVars != null) _addVarsFromMap(rootVars, out);
+    if (rootVars != null) {
+      _addVarsFromMap(rootVars, out, scope: ReleaseVariable.releaseScope);
+    }
     return out;
   }
 
-  static void _addVarsFromMap(dynamic vars, Map<String, ReleaseVariable> out) {
+  static Map<String, ReleaseVariable> _parseVariablesFromDefinition(Map<String, dynamic> data) =>
+      parseVariablesFromDefinition(data);
+
+  static void _addVarsFromMap(
+    dynamic vars,
+    Map<String, ReleaseVariable> out, {
+    required String scope,
+  }) {
     final m = vars is Map ? vars as Map<String, dynamic> : null;
     if (m == null) return;
     for (final e in m.entries) {
       final name = e.key as String;
       dynamic v = e.value;
+      final ReleaseVariable variable;
       if (v is Map) {
         final val = v['value']?.toString() ?? '';
         final secret = v['isSecret'] == true;
-        out[name] = ReleaseVariable(name: name, value: val, isSecret: secret);
+        variable = ReleaseVariable(name: name, value: val, isSecret: secret, scope: scope);
       } else {
-        out[name] = ReleaseVariable(name: name, value: v?.toString() ?? '');
+        variable = ReleaseVariable(name: name, value: v?.toString() ?? '', scope: scope);
       }
+      out[variable.mapKey] = variable;
     }
   }
 }
