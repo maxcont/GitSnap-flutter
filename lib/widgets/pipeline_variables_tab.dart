@@ -37,7 +37,15 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
   Set<String> _selectedScopesB = {};
   static const double _varsPanelFixedHeight = 500;
 
-  /// "Tutte" = carica Sviluppo + Collaudo + Esercizio e unisci
+  /// Cartelle frequenti nel menu (filtri rapidi, non limitano "Tutte").
+  static const _suggestedReleaseFolders = [
+    r'\Sviluppo',
+    r'\Collaudo',
+    r'\Pre-Esercizio',
+    r'\Esercizio',
+  ];
+
+  /// "Tutte" = tutte le pipeline del progetto, senza filtro cartella.
   Future<void> _loadDefinitions(AppState appState, {String? path}) async {
     if (appState.client == null) {
       setState(() => _error = 'Carica prima i repository (configura e connetti).');
@@ -61,22 +69,14 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     });
     try {
       List<ReleaseDefinitionInfo> list;
-      if (path == null || path.isEmpty) {
-        final futures = [
-          appState.client!.getReleaseDefinitions(path: r'\Sviluppo'),
-          appState.client!.getReleaseDefinitions(path: r'\Collaudo'),
-          appState.client!.getReleaseDefinitions(path: r'\Esercizio'),
-        ];
-        final results = await Future.wait(futures);
-        list = results.expand((l) => l).toList();
-        list.sort((a, b) {
-          final c = a.name.compareTo(b.name);
-          if (c != 0) return c;
-          return (a.path ?? '').compareTo(b.path ?? '');
-        });
-      } else {
-        list = await appState.client!.getReleaseDefinitions(path: path);
-      }
+      list = await appState.client!.getAllReleaseDefinitions(
+        path: (path == null || path.isEmpty) ? null : path,
+      );
+      list.sort((a, b) {
+        final c = a.name.compareTo(b.name);
+        if (c != 0) return c;
+        return (a.path ?? '').compareTo(b.path ?? '');
+      });
       final pattern = _patternController.text.trim();
       if (pattern.isNotEmpty) {
         list = list.where((d) => _matchesNamePattern(d.name, d.path ?? '', d.id, pattern)).toList();
@@ -521,7 +521,7 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Carica le definizioni (Sviluppo, Collaudo, Esercizio o Tutte). Scegli Pipeline A e Pipeline B, carica le variabili e confrontale (es. ProgConf Sviluppo vs ProgConf Collaudo).',
+                'Carica le pipeline di release. "Tutte le cartelle" include ogni cartella del progetto; le voci Sviluppo/Collaudo/… sono filtri rapidi. Scegli A e B e confronta le variabili.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                     ),
@@ -560,11 +560,17 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                         DropdownButton<String?>(
                             value: _folderPath,
                             hint: const Text('Cartella'),
-                            items: const [
-                              DropdownMenuItem(value: null, child: Text('Tutte (Sviluppo + Collaudo + Esercizio)')),
-                              DropdownMenuItem(value: r'\Sviluppo', child: Text('Sviluppo')),
-                              DropdownMenuItem(value: r'\Collaudo', child: Text('Collaudo')),
-                              DropdownMenuItem(value: r'\Esercizio', child: Text('Esercizio')),
+                            items: [
+                              const DropdownMenuItem(
+                                value: null,
+                                child: Text('Tutte le cartelle'),
+                              ),
+                              ..._suggestedReleaseFolders.map(
+                                (folder) => DropdownMenuItem(
+                                  value: folder,
+                                  child: Text(folder.replaceFirst(r'\', '')),
+                                ),
+                              ),
                             ],
                             onChanged: hasClient
                                 ? (v) {

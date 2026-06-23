@@ -50,6 +50,23 @@ flutter build windows --release
 ```
 L'eseguibile si troverà in: `build/windows/runner/Release/gitsnap_flutter.exe`
 
+#### Creare il pacchetto di release Windows
+
+Dopo aver eseguito la build, lancia lo script PowerShell per creare il pacchetto distribuibile:
+
+```powershell
+.\scripts\create_release.ps1
+```
+
+Lo script:
+1. Legge la versione corrente da `assets/release/release_version.md` e la **incrementa automaticamente**
+2. Crea la cartella `assets/release/output/GitSnap_v<versione>_windows_x64`
+3. Copia tutto l'output di build da `build/windows/x64/runner/Release`
+4. Aggiunge il **Manuale Utente** (`assets/release/Manuale Utente GitSnap.pdf`)
+5. Aggiorna il numero di versione in `release_version.md`
+
+> ⚠️ Lo script deve essere eseguito **dopo** `flutter build windows --release`, altrimenti termina con errore.
+
 #### macOS
 ```bash
 flutter build macos --release

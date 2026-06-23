@@ -315,11 +315,13 @@ class AzureDevOpsClient {
   Future<List<ReleaseDefinitionInfo>> getReleaseDefinitions({
     String? path,
     int top = 100,
+    int skip = 0,
   }) async {
     final q = <String, String>{
       'api-version': '7.0',
       r'$top': '$top',
     };
+    if (skip > 0) q[r'$skip'] = '$skip';
     if (path != null && path.isNotEmpty) q['path'] = path;
     final url = Uri.parse('$_releaseBase/definitions').replace(queryParameters: q);
     final response = await http.get(url, headers: _headers);
@@ -337,6 +339,20 @@ class AzureDevOpsClient {
         path: m['path'] as String?,
       );
     }).toList();
+  }
+
+  /// Carica tutte le definizioni, paginando oltre il limite di 100 per pagina.
+  Future<List<ReleaseDefinitionInfo>> getAllReleaseDefinitions({String? path}) async {
+    const pageSize = 100;
+    final all = <ReleaseDefinitionInfo>[];
+    var skip = 0;
+    while (true) {
+      final page = await getReleaseDefinitions(path: path, top: pageSize, skip: skip);
+      all.addAll(page);
+      if (page.length < pageSize) break;
+      skip += pageSize;
+    }
+    return all;
   }
 
   /// Revisions of a release definition (returns list of revision numbers)
