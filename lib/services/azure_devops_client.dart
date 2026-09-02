@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/azure_models.dart';
+import '../models/pull_request_models.dart';
 import '../models/release_models.dart';
 
 class AzureDevOpsClientError implements Exception {
@@ -81,6 +82,116 @@ class AzureDevOpsClient {
     }
   }
 
+  Future<List<PullRequestSummary>> getPullRequests(String repositoryId) async {
+    final url =
+        Uri.parse('$_apiBase/git/repositories/$repositoryId/pullrequests')
+            .replace(
+      queryParameters: {'api-version': '7.0', 'searchCriteria.status': 'all'},
+    );
+    final response = await http.get(url, headers: _headers);
+    if (response.statusCode != 200) {
+      throw AzureDevOpsClientError(
+          'Failed to fetch pull requests: ${response.statusCode}. ${_messageForStatus(response.statusCode, response.body)}');
+    }
+
+    final values = (json.decode(response.body) as Map<String, dynamic>)['value']
+            as List? ??
+        const [];
+    return values
+        .whereType<Map>()
+        .map((value) =>
+            PullRequestSummary.fromJson(Map<String, dynamic>.from(value)))
+        .toList();
+  }
+
+  Future<PullRequestIdentity> getCurrentUser() async {
+    final base = baseUrl != null && baseUrl!.isNotEmpty
+        ? '${baseUrl!.trim()}/$organization'
+        : 'https://dev.azure.com/$organization';
+    final response = await http.get(
+      Uri.parse('$base/_apis/connectionData?api-version=7.0'),
+      headers: _headers,
+    );
+    if (response.statusCode != 200) {
+      throw AzureDevOpsClientError(
+        'Failed to identify current user: ${response.statusCode}. '
+        '${_messageForStatus(response.statusCode, response.body)}',
+      );
+    }
+    final data = json.decode(response.body) as Map<String, dynamic>;
+    final user = data['authenticatedUser'];
+    if (user is! Map) {
+      throw AzureDevOpsClientError(
+          'Azure DevOps did not return the authenticated user.');
+    }
+    return PullRequestIdentity.fromJson(Map<String, dynamic>.from(user));
+  }
+
+  Future<PullRequestDetails> getPullRequestDetails(
+      String repositoryId, int pullRequestId) async {
+    final response = await http.get(
+        Uri.parse(
+            '$_apiBase/git/repositories/$repositoryId/pullrequests/$pullRequestId?api-version=7.0'),
+        headers: _headers);
+    if (response.statusCode != 200) {
+      throw AzureDevOpsClientError(
+          'Failed to fetch pull request details: ${response.statusCode}. ${_messageForStatus(response.statusCode, response.body)}');
+    }
+    return PullRequestDetails.fromJson(
+        json.decode(response.body) as Map<String, dynamic>);
+  }
+
+  Future<PullRequestMetrics> getPullRequestMetrics(
+      String repositoryId, int pullRequestId) async {
+    final base =
+        '$_apiBase/git/repositories/$repositoryId/pullrequests/$pullRequestId';
+    final responses = await Future.wait([
+      http.get(Uri.parse('$base/commits?api-version=7.0'), headers: _headers),
+      http.get(Uri.parse('$base/iterations?api-version=7.0'),
+          headers: _headers),
+      http.get(Uri.parse('$base/threads?api-version=7.0'), headers: _headers),
+    ]);
+    for (final response in responses) {
+      if (response.statusCode != 200) {
+        throw AzureDevOpsClientError(
+            'Failed to fetch pull request metrics: ${response.statusCode}. ${_messageForStatus(response.statusCode, response.body)}');
+      }
+    }
+    final commits = json.decode(responses[0].body) as Map<String, dynamic>;
+    final iterations = json.decode(responses[1].body) as Map<String, dynamic>;
+    final threads = json.decode(responses[2].body) as Map<String, dynamic>;
+    final iterationValues = iterations['value'] as List? ?? const [];
+    var changedFiles = 0;
+    if (iterationValues.isNotEmpty) {
+      final response = await http.get(
+        Uri.parse(
+                '$base/iterations/${(iterationValues.last as Map)['id']}/changes')
+            .replace(queryParameters: {'api-version': '7.0', r'$top': '2000'}),
+        headers: _headers,
+      );
+      if (response.statusCode != 200) {
+        throw AzureDevOpsClientError(
+            'Failed to fetch pull request changes: ${response.statusCode}. ${_messageForStatus(response.statusCode, response.body)}');
+      }
+      changedFiles = ((json.decode(response.body)
+                  as Map<String, dynamic>)['value'] as List?)
+              ?.length ??
+          0;
+    }
+    final threadValues = threads['value'] as List? ?? const [];
+    return PullRequestMetrics(
+      commitCount: (commits['value'] as List?)?.length ?? 0,
+      changedFileCount: changedFiles,
+      threadCount: threadValues.length,
+      commentCount: threadValues.fold<int>(
+        0,
+        (count, thread) =>
+            count +
+            (thread is Map ? (thread['comments'] as List?)?.length ?? 0 : 0),
+      ),
+    );
+  }
+
   /// Get branches for a repository
   Future<List<Map<String, dynamic>>> getBranches(String repoId) async {
     final url = Uri.parse(
@@ -89,7 +200,7 @@ class AzureDevOpsClient {
 
     try {
       final response = await http.get(url, headers: _headers);
-      
+
       if (response.statusCode != 200) {
         throw AzureDevOpsClientError(
           'Failed to fetch branches: ${response.statusCode}',
@@ -111,7 +222,7 @@ class AzureDevOpsClient {
 
     try {
       final response = await http.get(url, headers: _headers);
-      
+
       if (response.statusCode != 200) {
         throw AzureDevOpsClientError(
           'Failed to fetch tags: ${response.statusCode}',
@@ -130,10 +241,12 @@ class AzureDevOpsClient {
   /// Resolve a tag name to the commit it points to (for annotated tags the ref objectId is not the commit).
   /// Returns commit map with commitId and date, or null if not found.
   /// Tries api-version 7.0, 6.0, 5.0 for on-prem compatibility (like Streamlit).
-  Future<Map<String, dynamic>?> getCommitByTag(String repoId, String tagName) async {
+  Future<Map<String, dynamic>?> getCommitByTag(
+      String repoId, String tagName) async {
     const versions = ['7.0', '6.0', '5.0'];
     for (final apiVersion in versions) {
-      final url = Uri.parse('$_apiBase/git/repositories/$repoId/commits').replace(
+      final url =
+          Uri.parse('$_apiBase/git/repositories/$repoId/commits').replace(
         queryParameters: {
           'api-version': apiVersion,
           r'$top': '1',
@@ -163,7 +276,7 @@ class AzureDevOpsClient {
 
     try {
       final response = await http.get(url, headers: _headers);
-      
+
       if (response.statusCode != 200) {
         throw AzureDevOpsClientError(
           'Failed to fetch commit: ${response.statusCode}',
@@ -250,7 +363,8 @@ class AzureDevOpsClient {
     return changes
         .map((c) {
           final item = c is Map ? c['item'] : null;
-          final path = item is Map ? (item['path'] ?? item['originalPath']) : null;
+          final path =
+              item is Map ? (item['path'] ?? item['originalPath']) : null;
           final p = path ?? (c is Map ? c['path'] : null);
           return p is String ? p : null;
         })
@@ -265,7 +379,8 @@ class AzureDevOpsClient {
     String baseCommit,
     String targetCommit,
   ) async {
-    final url = Uri.parse('$_apiBase/git/repositories/$repoId/diffs/commits').replace(
+    final url =
+        Uri.parse('$_apiBase/git/repositories/$repoId/diffs/commits').replace(
       queryParameters: {
         'api-version': '7.0',
         'baseVersion': baseCommit,
@@ -277,7 +392,8 @@ class AzureDevOpsClient {
     );
     final response = await http.get(url, headers: _headers);
     if (response.statusCode != 200) {
-      throw AzureDevOpsClientError('Diffs/commits failed: ${response.statusCode}');
+      throw AzureDevOpsClientError(
+          'Diffs/commits failed: ${response.statusCode}');
     }
     final data = json.decode(response.body);
     return Map<String, dynamic>.from(data);
@@ -315,18 +431,18 @@ class AzureDevOpsClient {
   Future<List<ReleaseDefinitionInfo>> getReleaseDefinitions({
     String? path,
     int top = 100,
-    int skip = 0,
   }) async {
     final q = <String, String>{
       'api-version': '7.0',
       r'$top': '$top',
     };
-    if (skip > 0) q[r'$skip'] = '$skip';
     if (path != null && path.isNotEmpty) q['path'] = path;
-    final url = Uri.parse('$_releaseBase/definitions').replace(queryParameters: q);
+    final url =
+        Uri.parse('$_releaseBase/definitions').replace(queryParameters: q);
     final response = await http.get(url, headers: _headers);
     if (response.statusCode != 200) {
-      throw AzureDevOpsClientError('Release definitions: ${response.statusCode}');
+      throw AzureDevOpsClientError(
+          'Release definitions: ${response.statusCode}');
     }
     final data = json.decode(response.body);
     final list = data['value'] as List?;
@@ -341,23 +457,10 @@ class AzureDevOpsClient {
     }).toList();
   }
 
-  /// Carica tutte le definizioni, paginando oltre il limite di 100 per pagina.
-  Future<List<ReleaseDefinitionInfo>> getAllReleaseDefinitions({String? path}) async {
-    const pageSize = 100;
-    final all = <ReleaseDefinitionInfo>[];
-    var skip = 0;
-    while (true) {
-      final page = await getReleaseDefinitions(path: path, top: pageSize, skip: skip);
-      all.addAll(page);
-      if (page.length < pageSize) break;
-      skip += pageSize;
-    }
-    return all;
-  }
-
   /// Revisions of a release definition (returns list of revision numbers)
   Future<List<int>> getReleaseDefinitionRevisions(int definitionId) async {
-    final url = Uri.parse('$_releaseBase/definitions/$definitionId/revisions').replace(
+    final url =
+        Uri.parse('$_releaseBase/definitions/$definitionId/revisions').replace(
       queryParameters: {'api-version': '7.0'},
     );
     final response = await http.get(url, headers: _headers);
@@ -371,7 +474,8 @@ class AzureDevOpsClient {
       final m = Map<String, dynamic>.from(e);
       final n = m['revision'];
       return n is int ? n : (n as num).toInt();
-    }).toList()..sort((a, b) => b.compareTo(a));
+    }).toList()
+      ..sort((a, b) => b.compareTo(a));
   }
 
   /// Get release definition at a specific revision (includes variables)
@@ -384,14 +488,16 @@ class AzureDevOpsClient {
     );
     final response = await http.get(url, headers: _headers);
     if (response.statusCode != 200) {
-      throw AzureDevOpsClientError('Definition revision: ${response.statusCode}');
+      throw AzureDevOpsClientError(
+          'Definition revision: ${response.statusCode}');
     }
     final data = json.decode(response.body);
     return _parseVariablesFromDefinition(data);
   }
 
   /// Latest variables via project _releaseDefinition endpoint (on-prem style)
-  Future<Map<String, ReleaseVariable>> getLatestVariables(int definitionId) async {
+  Future<Map<String, ReleaseVariable>> getLatestVariables(
+      int definitionId) async {
     final base = baseUrl != null && baseUrl!.isNotEmpty
         ? '${baseUrl!.trim()}/$organization/$project'
         : 'https://dev.azure.com/$organization/$project';
@@ -413,7 +519,8 @@ class AzureDevOpsClient {
 
   /// Flatten variables from definition JSON (environments[].variables or root variables).
   /// Keys include scope so the same name in different environments is preserved.
-  static Map<String, ReleaseVariable> parseVariablesFromDefinition(Map<String, dynamic> data) {
+  static Map<String, ReleaseVariable> parseVariablesFromDefinition(
+      Map<String, dynamic> data) {
     final out = <String, ReleaseVariable>{};
     final envs = data['environments'] as List?;
     if (envs != null) {
@@ -432,7 +539,8 @@ class AzureDevOpsClient {
     return out;
   }
 
-  static Map<String, ReleaseVariable> _parseVariablesFromDefinition(Map<String, dynamic> data) =>
+  static Map<String, ReleaseVariable> _parseVariablesFromDefinition(
+          Map<String, dynamic> data) =>
       parseVariablesFromDefinition(data);
 
   static void _addVarsFromMap(
@@ -449,9 +557,11 @@ class AzureDevOpsClient {
       if (v is Map) {
         final val = v['value']?.toString() ?? '';
         final secret = v['isSecret'] == true;
-        variable = ReleaseVariable(name: name, value: val, isSecret: secret, scope: scope);
+        variable = ReleaseVariable(
+            name: name, value: val, isSecret: secret, scope: scope);
       } else {
-        variable = ReleaseVariable(name: name, value: v?.toString() ?? '', scope: scope);
+        variable = ReleaseVariable(
+            name: name, value: v?.toString() ?? '', scope: scope);
       }
       out[variable.mapKey] = variable;
     }

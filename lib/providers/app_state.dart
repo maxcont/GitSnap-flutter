@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../models/azure_models.dart';
+import '../models/pull_request_models.dart';
 import '../services/azure_devops_client.dart';
 import '../services/ref_resolver.dart';
 import '../services/diff_service.dart';
 import '../services/storage_service.dart';
+import '../services/pull_request_filter_service.dart';
 
 class AppState extends ChangeNotifier {
   final StorageService _storage = StorageService();
@@ -30,6 +32,11 @@ class AppState extends ChangeNotifier {
   List<DiffResult> _diffResults = [];
   bool _isLoading = false;
   String? _errorMessage;
+  List<PullRequestSummary> _allPullRequests = [];
+  PullRequestFilter _pullRequestFilter = PullRequestFilter.defaults();
+  bool _isLoadingPullRequests = false;
+  Map<String, String> _pullRequestRepositoryErrors = {};
+  PullRequestIdentity? _currentPullRequestUser;
 
   // Projects
   List<ProjectConfig> _projects = [];
@@ -51,6 +58,25 @@ class AppState extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   List<ProjectConfig> get projects => _projects;
   String? get currentProjectId => _currentProjectId;
+  List<PullRequestSummary> get allPullRequests =>
+      List.unmodifiable(_allPullRequests);
+  PullRequestFilter get pullRequestFilter => _pullRequestFilter;
+  bool get isLoadingPullRequests => _isLoadingPullRequests;
+  Map<String, String> get pullRequestRepositoryErrors =>
+      Map.unmodifiable(_pullRequestRepositoryErrors);
+  PullRequestIdentity? get currentPullRequestUser => _currentPullRequestUser;
+  List<PullRequestSummary> get filteredPullRequests =>
+      PullRequestFilterService.filter(
+        pullRequests: _allPullRequests,
+        filter: _pullRequestFilter,
+        currentUser: _currentPullRequestUser,
+      );
+  Map<PullRequestStatus, int> get pullRequestStatusCounts =>
+      PullRequestFilterService.statusCounts(
+        pullRequests: _allPullRequests,
+        filter: _pullRequestFilter,
+        currentUser: _currentPullRequestUser,
+      );
 
   AppState() {
     _loadInitialData();
@@ -59,26 +85,26 @@ class AppState extends ChangeNotifier {
   Future<void> _loadInitialData() async {
     _projects = await _storage.loadProjects();
     final config = await _storage.loadConfig();
-    
+
     if (config.isNotEmpty) {
       _baseUrl = config['base_url'] ?? '';
       _organization = config['organization'] ?? '';
       _project = config['project'] ?? '';
       _username = config['username'] ?? '';
-      
+
       if (config['selected_repo_ids'] != null) {
         _selectedRepoIds = Set<String>.from(config['selected_repo_ids']);
       }
-      
+
       if (config['source'] != null) {
         _sourceRef = RefConfig.fromJson(config['source']);
       }
-      
+
       if (config['target'] != null) {
         _targetRef = RefConfig.fromJson(config['target']);
       }
     }
-    
+
     notifyListeners();
   }
 
@@ -144,8 +170,10 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       return;
     }
+
     if (_pat.isEmpty) {
-      _errorMessage = 'Inserisci il PAT (Personal Access Token) per autenticarti ad Azure DevOps.';
+      _errorMessage =
+          'Inserisci il PAT (Personal Access Token) per autenticarti ad Azure DevOps.';
       notifyListeners();
       return;
     }
@@ -174,6 +202,73 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  void setPullRequestFilter(PullRequestFilter filter) {
+    _pullRequestFilter = filter;
+    notifyListeners();
+  }
+
+  Future<void> loadPullRequests() async {
+    if (_organization.isEmpty || _project.isEmpty || _pat.isEmpty) {
+      _errorMessage =
+          'Configura organizzazione, progetto e PAT per caricare le pull request.';
+      notifyListeners();
+      return;
+    }
+    _isLoadingPullRequests = true;
+    _errorMessage = null;
+    _allPullRequests = [];
+    _pullRequestRepositoryErrors = {};
+    notifyListeners();
+    try {
+      _client ??= AzureDevOpsClient(
+        organization: _organization,
+        project: _project,
+        pat: _pat,
+        username: _username.isEmpty ? null : _username,
+        baseUrl: _baseUrl.isEmpty ? null : _baseUrl,
+      );
+      try {
+        _currentPullRequestUser = await _client!.getCurrentUser();
+      } catch (error) {
+        _pullRequestRepositoryErrors['Utente autenticato'] = error.toString();
+      }
+      _repositories = _repositories.isEmpty
+          ? await _client!.getRepositories()
+          : _repositories;
+      const concurrency = 5;
+      for (var index = 0; index < _repositories.length; index += concurrency) {
+        final results = await Future.wait(
+            _repositories.skip(index).take(concurrency).map((repository) async {
+          try {
+            return (repository, await _client!.getPullRequests(repository.id));
+          } catch (error) {
+            _pullRequestRepositoryErrors[repository.name] = error.toString();
+            return (repository, <PullRequestSummary>[]);
+          }
+        }));
+        for (final result in results) {
+          _allPullRequests.addAll(result.$2);
+        }
+        notifyListeners();
+      }
+    } catch (error) {
+      _errorMessage = 'Errore nel caricamento delle pull request: $error';
+    } finally {
+      _isLoadingPullRequests = false;
+      notifyListeners();
+    }
+  }
+
+  Future<PullRequestDetails> loadPullRequestDetails(
+      PullRequestSummary pullRequest) async {
+    if (_client == null) throw StateError('Carica prima le pull request.');
+    final detail = await _client!
+        .getPullRequestDetails(pullRequest.repositoryId, pullRequest.id);
+    final metrics = await _client!
+        .getPullRequestMetrics(pullRequest.repositoryId, pullRequest.id);
+    return detail.copyWith(metrics: metrics);
+  }
+
   // Run comparison
   Future<void> runComparison() async {
     if (_client == null) {
@@ -193,9 +288,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final selectedRepos = _repositories
-          .where((r) => _selectedRepoIds.contains(r.id))
-          .toList();
+      final selectedRepos =
+          _repositories.where((r) => _selectedRepoIds.contains(r.id)).toList();
 
       const parallelLimit = 5;
       final resolver = RefResolver(_client!);
@@ -285,6 +379,9 @@ class AppState extends ChangeNotifier {
     _selectedRepoIds.clear();
     _diffResults = [];
     _client = null;
+    _allPullRequests = [];
+    _pullRequestRepositoryErrors = {};
+    _currentPullRequestUser = null;
     notifyListeners();
   }
 

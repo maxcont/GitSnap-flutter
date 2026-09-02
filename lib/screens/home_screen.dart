@@ -7,6 +7,7 @@ import '../widgets/ref_config_panel.dart';
 import '../widgets/results_dashboard.dart';
 import '../widgets/projects_sidebar.dart';
 import '../widgets/pipeline_variables_tab.dart';
+import '../widgets/pull_requests_tab.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -14,25 +15,35 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: Row(
-            children: [
-              const Text('🔄 GitSnap – Confronto Ambienti'),
-              const SizedBox(width: 16),
-              Text(
-                '·  M.Contursi',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                    ),
-              ),
-            ],
+          title: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              children: [
+                const Text('🔄 GitSnap – Confronto Ambienti'),
+                const SizedBox(width: 16),
+                Text(
+                  '·  M.Contursi',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.6),
+                      ),
+                ),
+              ],
+            ),
           ),
           bottom: const TabBar(
             tabs: [
-              Tab(text: 'Confronto repository', icon: Icon(Icons.compare_arrows)),
+              Tab(
+                  text: 'Confronto repository',
+                  icon: Icon(Icons.compare_arrows)),
               Tab(text: 'Utility pipeline', icon: Icon(Icons.build)),
+              Tab(text: 'Pull request', icon: Icon(Icons.call_split)),
             ],
           ),
           actions: [
@@ -68,6 +79,7 @@ class HomeScreen extends StatelessWidget {
           children: [
             _ComparisonTab(),
             const PipelineVariablesTab(),
+            const PullRequestsTab(),
           ],
         ),
       ),
@@ -95,7 +107,6 @@ class _ComparisonTab extends StatelessWidget {
                     ),
               ),
               const SizedBox(height: 24),
-
               if (appState.errorMessage != null)
                 Card(
                   color: Theme.of(context).colorScheme.errorContainer,
@@ -112,8 +123,9 @@ class _ComparisonTab extends StatelessWidget {
                           child: Text(
                             appState.errorMessage!,
                             style: TextStyle(
-                              color:
-                                  Theme.of(context).colorScheme.onErrorContainer,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onErrorContainer,
                             ),
                           ),
                         ),
@@ -126,24 +138,19 @@ class _ComparisonTab extends StatelessWidget {
                   ),
                 ),
               if (appState.errorMessage != null) const SizedBox(height: 16),
-
               const ConfigPanel(),
               const SizedBox(height: 24),
-
               if (appState.repositories.isNotEmpty) ...[
                 const RepositorySelector(),
                 const SizedBox(height: 24),
               ],
-
               if (appState.selectedRepoIds.isNotEmpty) ...[
                 const RefConfigPanel(),
                 const SizedBox(height: 24),
               ],
-
               if (appState.diffResults.isNotEmpty) ...[
                 const ResultsDashboard(),
               ],
-
               if (appState.isLoading)
                 const Center(
                   child: Padding(
@@ -151,7 +158,6 @@ class _ComparisonTab extends StatelessWidget {
                     child: CircularProgressIndicator(),
                   ),
                 ),
-
               const SizedBox(height: 32),
               Center(
                 child: Text(

@@ -48,7 +48,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
   /// "Tutte" = tutte le pipeline del progetto, senza filtro cartella.
   Future<void> _loadDefinitions(AppState appState, {String? path}) async {
     if (appState.client == null) {
-      setState(() => _error = 'Carica prima i repository (configura e connetti).');
+      setState(
+          () => _error = 'Carica prima i repository (configura e connetti).');
       return;
     }
     setState(() {
@@ -69,7 +70,7 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     });
     try {
       List<ReleaseDefinitionInfo> list;
-      list = await appState.client!.getAllReleaseDefinitions(
+      list = await appState.client!.getReleaseDefinitions(
         path: (path == null || path.isEmpty) ? null : path,
       );
       list.sort((a, b) {
@@ -79,7 +80,10 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
       });
       final pattern = _patternController.text.trim();
       if (pattern.isNotEmpty) {
-        list = list.where((d) => _matchesNamePattern(d.name, d.path ?? '', d.id, pattern)).toList();
+        list = list
+            .where(
+                (d) => _matchesNamePattern(d.name, d.path ?? '', d.id, pattern))
+            .toList();
       }
       setState(() {
         _definitions = list;
@@ -100,7 +104,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
   int? _selectedRevA;
   int? _selectedRevB;
 
-  Future<void> _loadRevisionsFor(AppState appState, int defId, bool forA) async {
+  Future<void> _loadRevisionsFor(
+      AppState appState, int defId, bool forA) async {
     if (appState.client == null) return;
     setState(() => _error = null);
     try {
@@ -119,7 +124,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     }
   }
 
-  Future<void> _loadVariablesA(AppState appState, {bool latest = true, int? revision}) async {
+  Future<void> _loadVariablesA(AppState appState,
+      {bool latest = true, int? revision}) async {
     final def = _selectedDefA;
     if (def == null || appState.client == null) return;
     setState(() => _loadingVars = true);
@@ -142,7 +148,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     }
   }
 
-  Future<void> _loadVariablesB(AppState appState, {bool latest = true, int? revision}) async {
+  Future<void> _loadVariablesB(AppState appState,
+      {bool latest = true, int? revision}) async {
     final def = _selectedDefB;
     if (def == null || appState.client == null) return;
     setState(() => _loadingVars = true);
@@ -173,7 +180,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
   }
 
   /// Match name/path/id against pattern; * = any characters (es. prog* = inizia con prog).
-  static bool _matchesNamePattern(String name, String path, int id, String pattern) {
+  static bool _matchesNamePattern(
+      String name, String path, int id, String pattern) {
     final p = pattern.trim().toLowerCase();
     if (p.isEmpty) return true;
     final nameL = name.toLowerCase();
@@ -182,12 +190,11 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     if (!p.contains('*')) {
       return nameL.contains(p) || pathL.contains(p) || idStr.contains(p);
     }
-    final regexStr = p
-        .split('*')
-        .map((s) => RegExp.escape(s))
-        .join('.*');
+    final regexStr = p.split('*').map((s) => RegExp.escape(s)).join('.*');
     final regex = RegExp('^$regexStr\$', caseSensitive: false);
-    return regex.hasMatch(nameL) || regex.hasMatch(pathL) || regex.hasMatch(idStr);
+    return regex.hasMatch(nameL) ||
+        regex.hasMatch(pathL) ||
+        regex.hasMatch(idStr);
   }
 
   static Widget _pad(Widget child) {
@@ -218,7 +225,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                   Icon(expanded ? Icons.expand_less : Icons.expand_more),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+                    child: Text(title,
+                        style: Theme.of(context).textTheme.titleMedium),
                   ),
                 ],
               ),
@@ -265,11 +273,14 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     return sorted.where((v) => selectedScopes.contains(v.scope)).toList();
   }
 
-  List<VariableDiffEntry> _filteredDiffForComparison(List<VariableDiffEntry> diff) {
+  List<VariableDiffEntry> _filteredDiffForComparison(
+      List<VariableDiffEntry> diff) {
     final scopesA = _sortedScopesFor(_variablesA).toSet();
     final scopesB = _sortedScopesFor(_variablesB).toSet();
-    final visibleA = _selectedScopesA.length >= scopesA.length ? scopesA : _selectedScopesA;
-    final visibleB = _selectedScopesB.length >= scopesB.length ? scopesB : _selectedScopesB;
+    final visibleA =
+        _selectedScopesA.length >= scopesA.length ? scopesA : _selectedScopesA;
+    final visibleB =
+        _selectedScopesB.length >= scopesB.length ? scopesB : _selectedScopesB;
     final visibleScopes = {...visibleA, ...visibleB};
     if (visibleScopes.isEmpty) return [];
     return diff.where((e) => visibleScopes.contains(e.scope)).toList();
@@ -293,7 +304,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
       context: context,
       builder: (ctx) => _ScopeSelectDialog(
         scopes: scopes,
-        initialSelected: selectedScopes.isEmpty ? scopes.toSet() : selectedScopes,
+        initialSelected:
+            selectedScopes.isEmpty ? scopes.toSet() : selectedScopes,
       ),
     );
     if (result != null) onChanged(result);
@@ -314,7 +326,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
           labelText: 'Filtra per ambito',
           border: const OutlineInputBorder(),
           isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           suffixIcon: const Icon(Icons.arrow_drop_down),
         ),
         child: InkWell(
@@ -351,12 +364,14 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     return Row(
       children: [
         Expanded(
-          child: Text(countLabel, style: Theme.of(context).textTheme.titleSmall),
+          child:
+              Text(countLabel, style: Theme.of(context).textTheme.titleSmall),
         ),
         if (showWidthToggle && onToggleWidth != null)
           IconButton(
             icon: Icon(fullWidth ? Icons.view_column : Icons.width_wide),
-            tooltip: fullWidth ? 'Ripristina larghezza' : 'Espandi in larghezza',
+            tooltip:
+                fullWidth ? 'Ripristina larghezza' : 'Espandi in larghezza',
             onPressed: onToggleWidth,
           ),
         IconButton(
@@ -424,7 +439,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     if (fullWidth) {
       return LayoutBuilder(
         builder: (context, constraints) {
-          final width = constraints.maxWidth.isFinite ? constraints.maxWidth : null;
+          final width =
+              constraints.maxWidth.isFinite ? constraints.maxWidth : null;
           return buildScroller(buildTable(width));
         },
       );
@@ -432,7 +448,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     return buildScroller(buildTable(null));
   }
 
-  static List<ReleaseVariable> _sortedVariables(Map<String, ReleaseVariable> vars) {
+  static List<ReleaseVariable> _sortedVariables(
+      Map<String, ReleaseVariable> vars) {
     final list = vars.values.toList()
       ..sort((a, b) {
         final byName = a.name.compareTo(b.name);
@@ -453,10 +470,12 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
       final name = va?.name ?? vb!.name;
       final scope = va?.scope ?? vb!.scope;
       if (va == null) {
-        return VariableDiffEntry(name: name, scope: scope, valueB: vb?.value, onlyInB: true);
+        return VariableDiffEntry(
+            name: name, scope: scope, valueB: vb?.value, onlyInB: true);
       }
       if (vb == null) {
-        return VariableDiffEntry(name: name, scope: scope, valueA: va.value, onlyInA: true);
+        return VariableDiffEntry(
+            name: name, scope: scope, valueA: va.value, onlyInA: true);
       }
       return VariableDiffEntry(
         name: name,
@@ -491,7 +510,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     return variables.map((v) {
       return DataRow(
         cells: [
-          DataCell(Text(v.name, style: const TextStyle(fontFamily: 'monospace'))),
+          DataCell(
+              Text(v.name, style: const TextStyle(fontFamily: 'monospace'))),
           DataCell(SelectableText(v.displayValue)),
           DataCell(Text(v.scope)),
         ],
@@ -523,7 +543,10 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
               Text(
                 'Carica le pipeline di release. "Tutte le cartelle" include ogni cartella del progetto; le voci Sviluppo/Collaudo/… sono filtri rapidi. Scegli A e B e confronta le variabili.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.7),
                     ),
               ),
               const SizedBox(height: 24),
@@ -534,9 +557,16 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                     padding: const EdgeInsets.all(12),
                     child: Row(
                       children: [
-                        Icon(Icons.error_outline, color: Theme.of(context).colorScheme.onErrorContainer),
+                        Icon(Icons.error_outline,
+                            color:
+                                Theme.of(context).colorScheme.onErrorContainer),
                         const SizedBox(width: 12),
-                        Expanded(child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer))),
+                        Expanded(
+                            child: Text(_error!,
+                                style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onErrorContainer))),
                         IconButton(
                           icon: const Icon(Icons.close),
                           onPressed: () => setState(() => _error = null),
@@ -558,198 +588,256 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                     Row(
                       children: [
                         DropdownButton<String?>(
-                            value: _folderPath,
-                            hint: const Text('Cartella'),
-                            items: [
-                              const DropdownMenuItem(
-                                value: null,
-                                child: Text('Tutte le cartelle'),
-                              ),
-                              ..._suggestedReleaseFolders.map(
-                                (folder) => DropdownMenuItem(
-                                  value: folder,
-                                  child: Text(folder.replaceFirst(r'\', '')),
-                                ),
-                              ),
-                            ],
-                            onChanged: hasClient
-                                ? (v) {
-                                    setState(() => _folderPath = v);
-                                    _loadDefinitions(appState, path: v);
-                                  }
-                                : null,
-                          ),
-                          const SizedBox(width: 12),
-                          SizedBox(
-                            width: 180,
-                            child: TextField(
-                              controller: _patternController,
-                              decoration: const InputDecoration(
-                                hintText: 'Pattern (es. prog*)',
-                                isDense: true,
-                                border: OutlineInputBorder(),
-                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              ),
-                              onSubmitted: (_) {
-                                if (hasClient && !_loadingDefs) _loadDefinitions(appState, path: _folderPath);
-                              },
+                          value: _folderPath,
+                          hint: const Text('Cartella'),
+                          items: [
+                            const DropdownMenuItem(
+                              value: null,
+                              child: Text('Tutte le cartelle'),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          ElevatedButton.icon(
-                            onPressed: hasClient && !_loadingDefs
-                                ? () => _loadDefinitions(appState, path: _folderPath)
-                                : null,
-                            icon: _loadingDefs
-                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                                : const Icon(Icons.refresh),
-                            label: Text(_loadingDefs ? 'Caricamento…' : 'Carica pipeline'),
-                          ),
-                        ],
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text(
-                          'Pattern: usa * come jolly (prog* = nome che inizia con prog, *prog* = contiene prog). Lascia vuoto per tutte.',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.65),
-                              ),
-                        ),
-                      ),
-                      if (_definitions.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Text(
-                              'Pipeline caricate (${_definitions.length})',
-                              style: Theme.of(context).textTheme.titleSmall,
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: TextField(
-                                controller: _filterController,
-                                decoration: InputDecoration(
-                                  hintText: 'Filtra per nome, cartella o ID…',
-                                  prefixIcon: const Icon(Icons.search, size: 20),
-                                  isDense: true,
-                                  border: const OutlineInputBorder(),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                ),
-                                onChanged: (v) => setState(() => _filterQuery = v),
+                            ..._suggestedReleaseFolders.map(
+                              (folder) => DropdownMenuItem(
+                                value: folder,
+                                child: Text(folder.replaceFirst(r'\', '')),
                               ),
                             ),
                           ],
+                          onChanged: hasClient
+                              ? (v) {
+                                  setState(() => _folderPath = v);
+                                  _loadDefinitions(appState, path: v);
+                                }
+                              : null,
                         ),
-                        const SizedBox(height: 12),
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final filtered = _filteredDefinitions;
-                            final crossAxisCount = (constraints.maxWidth / 240).floor().clamp(2, 5);
-                            return filtered.isEmpty
-                                ? Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 24),
-                                    child: Center(
-                                      child: Text(
-                                        _filterQuery.trim().isEmpty
-                                            ? 'Nessuna pipeline'
-                                            : 'Nessun risultato per "$_filterQuery"',
-                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                                            ),
-                                      ),
-                                    ),
-                                  )
-                                : GridView.builder(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: crossAxisCount,
-                                      mainAxisExtent: 56,
-                                      crossAxisSpacing: 8,
-                                      mainAxisSpacing: 6,
-                                    ),
-                                    itemCount: filtered.length,
-                                    itemBuilder: (context, i) {
-                                      final d = filtered[i];
-                                      final isA = _selectedDefA?.id == d.id;
-                                      final isB = _selectedDefB?.id == d.id;
-                                      return Material(
-                                        color: (isA || isB)
-                                            ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.35)
-                                            : Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                                          child: Row(
-                                            children: [
-                                              Expanded(
-                                                child: Column(
-                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      d.name,
-                                                      overflow: TextOverflow.ellipsis,
-                                                      maxLines: 1,
-                                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                                                    ),
-                                                    Text(
-                                                      '${d.path ?? "—"} · #${d.id}',
-                                                      overflow: TextOverflow.ellipsis,
-                                                      maxLines: 1,
-                                                      style: TextStyle(
-                                                        fontSize: 10,
-                                                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.65),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              FilterChip(
-                                                label: const Text('A'),
-                                                selected: isA,
-                                                onSelected: (v) {
-                                                  setState(() {
-                                                    _selectedDefA = v ? d : null;
-                                                    _revisionsA = [];
-                                                    _variablesA = {};
-                                                    _selectedScopesA = {};
-                                                    if (!_isSinglePipelineView) _singlePanelFullWidth = false;
-                                                  });
-                                                  if (v) _loadRevisionsFor(appState, d.id, true);
-                                                },
-                                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                              ),
-                                              const SizedBox(width: 2),
-                                              FilterChip(
-                                                label: const Text('B'),
-                                                selected: isB,
-                                                onSelected: (v) {
-                                                  setState(() {
-                                                    _selectedDefB = v ? d : null;
-                                                    _revisionsB = [];
-                                                    _variablesB = {};
-                                                    _selectedScopesB = {};
-                                                    if (!_isSinglePipelineView) _singlePanelFullWidth = false;
-                                                  });
-                                                  if (v) _loadRevisionsFor(appState, d.id, false);
-                                                },
-                                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  );
-                          },
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: 180,
+                          child: TextField(
+                            controller: _patternController,
+                            decoration: const InputDecoration(
+                              hintText: 'Pattern (es. prog*)',
+                              isDense: true,
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 8),
+                            ),
+                            onSubmitted: (_) {
+                              if (hasClient && !_loadingDefs)
+                                _loadDefinitions(appState, path: _folderPath);
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          onPressed: hasClient && !_loadingDefs
+                              ? () =>
+                                  _loadDefinitions(appState, path: _folderPath)
+                              : null,
+                          icon: _loadingDefs
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.refresh),
+                          label: Text(_loadingDefs
+                              ? 'Caricamento…'
+                              : 'Carica pipeline'),
                         ),
                       ],
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        'Pattern: usa * come jolly (prog* = nome che inizia con prog, *prog* = contiene prog). Lascia vuoto per tutte.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.65),
+                            ),
+                      ),
+                    ),
+                    if (_definitions.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Text(
+                            'Pipeline caricate (${_definitions.length})',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: TextField(
+                              controller: _filterController,
+                              decoration: InputDecoration(
+                                hintText: 'Filtra per nome, cartella o ID…',
+                                prefixIcon: const Icon(Icons.search, size: 20),
+                                isDense: true,
+                                border: const OutlineInputBorder(),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                              ),
+                              onChanged: (v) =>
+                                  setState(() => _filterQuery = v),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final filtered = _filteredDefinitions;
+                          final crossAxisCount =
+                              (constraints.maxWidth / 240).floor().clamp(2, 5);
+                          return filtered.isEmpty
+                              ? Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 24),
+                                  child: Center(
+                                    child: Text(
+                                      _filterQuery.trim().isEmpty
+                                          ? 'Nessuna pipeline'
+                                          : 'Nessun risultato per "$_filterQuery"',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withOpacity(0.6),
+                                          ),
+                                    ),
+                                  ),
+                                )
+                              : GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: crossAxisCount,
+                                    mainAxisExtent: 56,
+                                    crossAxisSpacing: 8,
+                                    mainAxisSpacing: 6,
+                                  ),
+                                  itemCount: filtered.length,
+                                  itemBuilder: (context, i) {
+                                    final d = filtered[i];
+                                    final isA = _selectedDefA?.id == d.id;
+                                    final isB = _selectedDefB?.id == d.id;
+                                    return Material(
+                                      color: (isA || isB)
+                                          ? Theme.of(context)
+                                              .colorScheme
+                                              .primaryContainer
+                                              .withOpacity(0.35)
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .surfaceContainerHighest
+                                              .withOpacity(0.5),
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 6),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    d.name,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    maxLines: 1,
+                                                    style: const TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.w500),
+                                                  ),
+                                                  Text(
+                                                    '${d.path ?? "—"} · #${d.id}',
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    maxLines: 1,
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      color: Theme.of(context)
+                                                          .colorScheme
+                                                          .onSurface
+                                                          .withOpacity(0.65),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            FilterChip(
+                                              label: const Text('A'),
+                                              selected: isA,
+                                              onSelected: (v) {
+                                                setState(() {
+                                                  _selectedDefA = v ? d : null;
+                                                  _revisionsA = [];
+                                                  _variablesA = {};
+                                                  _selectedScopesA = {};
+                                                  if (!_isSinglePipelineView)
+                                                    _singlePanelFullWidth =
+                                                        false;
+                                                });
+                                                if (v)
+                                                  _loadRevisionsFor(
+                                                      appState, d.id, true);
+                                              },
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 4,
+                                                      vertical: 0),
+                                              materialTapTargetSize:
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
+                                            ),
+                                            const SizedBox(width: 2),
+                                            FilterChip(
+                                              label: const Text('B'),
+                                              selected: isB,
+                                              onSelected: (v) {
+                                                setState(() {
+                                                  _selectedDefB = v ? d : null;
+                                                  _revisionsB = [];
+                                                  _variablesB = {};
+                                                  _selectedScopesB = {};
+                                                  if (!_isSinglePipelineView)
+                                                    _singlePanelFullWidth =
+                                                        false;
+                                                });
+                                                if (v)
+                                                  _loadRevisionsFor(
+                                                      appState, d.id, false);
+                                              },
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 4,
+                                                      vertical: 0),
+                                              materialTapTargetSize:
+                                                  MaterialTapTargetSize
+                                                      .shrinkWrap,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                        },
+                      ),
                     ],
-                  ),
+                  ],
                 ),
+              ),
               if (_selectedDefA != null || _selectedDefB != null) ...[
                 const SizedBox(height: 16),
                 LayoutBuilder(
@@ -757,21 +845,34 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                     final sideBySide = constraints.maxWidth >= 700;
                     final panelA = _collapsibleCard(
                       context: context,
-                      title: '2. Variabili A${_selectedDefA != null ? " · ${_selectedDefA!.name} (${_selectedDefA!.path ?? ""})" : ""}',
+                      title:
+                          '2. Variabili A${_selectedDefA != null ? " · ${_selectedDefA!.name} (${_selectedDefA!.path ?? ""})" : ""}',
                       expanded: _expandVariabiliA,
-                      onToggle: () => setState(() => _expandVariabiliA = !_expandVariabiliA),
+                      onToggle: () => setState(
+                          () => _expandVariabiliA = !_expandVariabiliA),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (_selectedDefA == null)
-                            Text('Seleziona una pipeline come A dalla lista sopra.', style: Theme.of(context).textTheme.bodySmall),
+                            Text(
+                                'Seleziona una pipeline come A dalla lista sopra.',
+                                style: Theme.of(context).textTheme.bodySmall),
                           if (_selectedDefA != null) ...[
                             Row(
                               children: [
                                 ElevatedButton.icon(
-                                  onPressed: hasClient && !_loadingVars ? () => _loadVariablesA(appState, latest: true) : null,
-                                  icon: _loadingVars ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.download),
+                                  onPressed: hasClient && !_loadingVars
+                                      ? () => _loadVariablesA(appState,
+                                          latest: true)
+                                      : null,
+                                  icon: _loadingVars
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2))
+                                      : const Icon(Icons.download),
                                   label: const Text('Carica A (ultime)'),
                                 ),
                                 if (_revisionsA.isNotEmpty) ...[
@@ -779,12 +880,21 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                   DropdownButton<int>(
                                     value: _selectedRevA,
                                     hint: const Text('Revisione A'),
-                                    items: _revisionsA.take(30).map((r) => DropdownMenuItem(value: r, child: Text('$r'))).toList(),
-                                    onChanged: (r) => setState(() => _selectedRevA = r),
+                                    items: _revisionsA
+                                        .take(30)
+                                        .map((r) => DropdownMenuItem(
+                                            value: r, child: Text('$r')))
+                                        .toList(),
+                                    onChanged: (r) =>
+                                        setState(() => _selectedRevA = r),
                                   ),
                                   TextButton.icon(
-                                    onPressed: hasClient && !_loadingVars && _selectedRevA != null
-                                        ? () => _loadVariablesA(appState, latest: false, revision: _selectedRevA)
+                                    onPressed: hasClient &&
+                                            !_loadingVars &&
+                                            _selectedRevA != null
+                                        ? () => _loadVariablesA(appState,
+                                            latest: false,
+                                            revision: _selectedRevA)
                                         : null,
                                     icon: const Icon(Icons.history),
                                     label: const Text('Carica revisione A'),
@@ -792,30 +902,39 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                 ],
                               ],
                             ),
-                          if (_variablesA.isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            _scopeMultiSelect(
-                              context: context,
-                              scopes: _sortedScopesFor(_variablesA),
-                              selectedScopes: _selectedScopesA,
-                              onChanged: (scopes) => setState(() => _selectedScopesA = scopes),
-                            ),
-                            const SizedBox(height: 12),
-                            _variablesToolbar(
-                              context,
-                              countLabel: _variablesCountLabel('Variabili A', _variablesA, _selectedScopesA),
-                              fullHeight: _varsPanelAFullHeight,
-                              onToggleHeight: () => setState(() => _varsPanelAFullHeight = !_varsPanelAFullHeight),
-                              showWidthToggle: _isSinglePipelineView && _selectedDefA != null,
-                              fullWidth: _singlePanelFullWidth,
-                              onToggleWidth: () => setState(() => _singlePanelFullWidth = !_singlePanelFullWidth),
-                            ),
-                            const SizedBox(height: 6),
-                            _variablesTable(
-                              _filteredVariables(_variablesA, _selectedScopesA),
-                              fullHeight: _varsPanelAFullHeight,
-                              fullWidth: _isSinglePipelineView && _singlePanelFullWidth,
-                            ),
+                            if (_variablesA.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              _scopeMultiSelect(
+                                context: context,
+                                scopes: _sortedScopesFor(_variablesA),
+                                selectedScopes: _selectedScopesA,
+                                onChanged: (scopes) =>
+                                    setState(() => _selectedScopesA = scopes),
+                              ),
+                              const SizedBox(height: 12),
+                              _variablesToolbar(
+                                context,
+                                countLabel: _variablesCountLabel('Variabili A',
+                                    _variablesA, _selectedScopesA),
+                                fullHeight: _varsPanelAFullHeight,
+                                onToggleHeight: () => setState(() =>
+                                    _varsPanelAFullHeight =
+                                        !_varsPanelAFullHeight),
+                                showWidthToggle: _isSinglePipelineView &&
+                                    _selectedDefA != null,
+                                fullWidth: _singlePanelFullWidth,
+                                onToggleWidth: () => setState(() =>
+                                    _singlePanelFullWidth =
+                                        !_singlePanelFullWidth),
+                              ),
+                              const SizedBox(height: 6),
+                              _variablesTable(
+                                _filteredVariables(
+                                    _variablesA, _selectedScopesA),
+                                fullHeight: _varsPanelAFullHeight,
+                                fullWidth: _isSinglePipelineView &&
+                                    _singlePanelFullWidth,
+                              ),
                             ],
                           ],
                         ],
@@ -823,21 +942,34 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                     );
                     final panelB = _collapsibleCard(
                       context: context,
-                      title: '3. Variabili B${_selectedDefB != null ? " · ${_selectedDefB!.name} (${_selectedDefB!.path ?? ""})" : ""}',
+                      title:
+                          '3. Variabili B${_selectedDefB != null ? " · ${_selectedDefB!.name} (${_selectedDefB!.path ?? ""})" : ""}',
                       expanded: _expandVariabiliB,
-                      onToggle: () => setState(() => _expandVariabiliB = !_expandVariabiliB),
+                      onToggle: () => setState(
+                          () => _expandVariabiliB = !_expandVariabiliB),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (_selectedDefB == null)
-                            Text('Seleziona una pipeline come B dalla lista sopra.', style: Theme.of(context).textTheme.bodySmall),
+                            Text(
+                                'Seleziona una pipeline come B dalla lista sopra.',
+                                style: Theme.of(context).textTheme.bodySmall),
                           if (_selectedDefB != null) ...[
                             Row(
                               children: [
                                 ElevatedButton.icon(
-                                  onPressed: hasClient && !_loadingVars ? () => _loadVariablesB(appState, latest: true) : null,
-                                  icon: _loadingVars ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.download),
+                                  onPressed: hasClient && !_loadingVars
+                                      ? () => _loadVariablesB(appState,
+                                          latest: true)
+                                      : null,
+                                  icon: _loadingVars
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2))
+                                      : const Icon(Icons.download),
                                   label: const Text('Carica B (ultime)'),
                                 ),
                                 if (_revisionsB.isNotEmpty) ...[
@@ -845,12 +977,21 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                   DropdownButton<int>(
                                     value: _selectedRevB,
                                     hint: const Text('Revisione B'),
-                                    items: _revisionsB.take(30).map((r) => DropdownMenuItem(value: r, child: Text('$r'))).toList(),
-                                    onChanged: (r) => setState(() => _selectedRevB = r),
+                                    items: _revisionsB
+                                        .take(30)
+                                        .map((r) => DropdownMenuItem(
+                                            value: r, child: Text('$r')))
+                                        .toList(),
+                                    onChanged: (r) =>
+                                        setState(() => _selectedRevB = r),
                                   ),
                                   TextButton.icon(
-                                    onPressed: hasClient && !_loadingVars && _selectedRevB != null
-                                        ? () => _loadVariablesB(appState, latest: false, revision: _selectedRevB)
+                                    onPressed: hasClient &&
+                                            !_loadingVars &&
+                                            _selectedRevB != null
+                                        ? () => _loadVariablesB(appState,
+                                            latest: false,
+                                            revision: _selectedRevB)
                                         : null,
                                     icon: const Icon(Icons.history),
                                     label: const Text('Carica revisione B'),
@@ -858,37 +999,48 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                 ],
                               ],
                             ),
-                          if (_variablesB.isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            _scopeMultiSelect(
-                              context: context,
-                              scopes: _sortedScopesFor(_variablesB),
-                              selectedScopes: _selectedScopesB,
-                              onChanged: (scopes) => setState(() => _selectedScopesB = scopes),
-                            ),
-                            const SizedBox(height: 12),
-                            _variablesToolbar(
-                              context,
-                              countLabel: _variablesCountLabel('Variabili B', _variablesB, _selectedScopesB),
-                              fullHeight: _varsPanelBFullHeight,
-                              onToggleHeight: () => setState(() => _varsPanelBFullHeight = !_varsPanelBFullHeight),
-                              showWidthToggle: _isSinglePipelineView && _selectedDefB != null,
-                              fullWidth: _singlePanelFullWidth,
-                              onToggleWidth: () => setState(() => _singlePanelFullWidth = !_singlePanelFullWidth),
-                            ),
-                            const SizedBox(height: 6),
-                            _variablesTable(
-                              _filteredVariables(_variablesB, _selectedScopesB),
-                              fullHeight: _varsPanelBFullHeight,
-                              fullWidth: _isSinglePipelineView && _singlePanelFullWidth,
-                            ),
+                            if (_variablesB.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              _scopeMultiSelect(
+                                context: context,
+                                scopes: _sortedScopesFor(_variablesB),
+                                selectedScopes: _selectedScopesB,
+                                onChanged: (scopes) =>
+                                    setState(() => _selectedScopesB = scopes),
+                              ),
+                              const SizedBox(height: 12),
+                              _variablesToolbar(
+                                context,
+                                countLabel: _variablesCountLabel('Variabili B',
+                                    _variablesB, _selectedScopesB),
+                                fullHeight: _varsPanelBFullHeight,
+                                onToggleHeight: () => setState(() =>
+                                    _varsPanelBFullHeight =
+                                        !_varsPanelBFullHeight),
+                                showWidthToggle: _isSinglePipelineView &&
+                                    _selectedDefB != null,
+                                fullWidth: _singlePanelFullWidth,
+                                onToggleWidth: () => setState(() =>
+                                    _singlePanelFullWidth =
+                                        !_singlePanelFullWidth),
+                              ),
+                              const SizedBox(height: 6),
+                              _variablesTable(
+                                _filteredVariables(
+                                    _variablesB, _selectedScopesB),
+                                fullHeight: _varsPanelBFullHeight,
+                                fullWidth: _isSinglePipelineView &&
+                                    _singlePanelFullWidth,
+                              ),
                             ],
                           ],
                         ],
                       ),
                     );
-                    final onlyA = _selectedDefA != null && _selectedDefB == null;
-                    final onlyB = _selectedDefB != null && _selectedDefA == null;
+                    final onlyA =
+                        _selectedDefA != null && _selectedDefB == null;
+                    final onlyB =
+                        _selectedDefB != null && _selectedDefA == null;
                     if (onlyA) {
                       return panelA;
                     }
@@ -922,110 +1074,140 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                   context: context,
                   title: '4. Confronto A vs B',
                   expanded: _expandConfronto,
-                  onToggle: () => setState(() => _expandConfronto = !_expandConfronto),
+                  onToggle: () =>
+                      setState(() => _expandConfronto = !_expandConfronto),
                   child: Builder(
-                            builder: (context) {
-                              final diff = _filteredDiffForComparison(_computeDiff(_variablesA, _variablesB));
-                              final onlyA = diff.where((e) => e.onlyInA).length;
-                              final onlyB = diff.where((e) => e.onlyInB).length;
-                              final different = diff.where((e) => e.different).length;
-                              final screenWidth = MediaQuery.of(context).size.width;
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                    builder: (context) {
+                      final diff = _filteredDiffForComparison(
+                          _computeDiff(_variablesA, _variablesB));
+                      final onlyA = diff.where((e) => e.onlyInA).length;
+                      final onlyB = diff.where((e) => e.onlyInB).length;
+                      final different = diff.where((e) => e.different).length;
+                      final screenWidth = MediaQuery.of(context).size.width;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 16,
+                            children: [
+                              Chip(
+                                  label: Text('Solo in A: $onlyA'),
+                                  backgroundColor:
+                                      Colors.blue.withOpacity(0.2)),
+                              Chip(
+                                  label: Text('Solo in B: $onlyB'),
+                                  backgroundColor:
+                                      Colors.orange.withOpacity(0.2)),
+                              Chip(
+                                  label: Text('Valori diversi: $different'),
+                                  backgroundColor:
+                                      Colors.amber.withOpacity(0.2)),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                // Usa tutta la larghezza disponibile del pannello,
+                                // ma consenti comunque di allargare con lo scroll orizzontale se serve.
+                                minWidth: screenWidth -
+                                    96, // 16 padding esterno + 16 interno card * 2 circa
+                              ),
+                              child: Table(
+                                columnWidths: const <int, TableColumnWidth>{
+                                  0: FlexColumnWidth(1),
+                                  1: FlexColumnWidth(2),
+                                  2: FlexColumnWidth(2),
+                                  3: FlexColumnWidth(1.5),
+                                  4: FlexColumnWidth(1),
+                                },
+                                border: TableBorder.all(
+                                  color: Theme.of(context).dividerColor,
+                                  width: 0.5,
+                                ),
+                                defaultVerticalAlignment:
+                                    TableCellVerticalAlignment.middle,
                                 children: [
-                                  Wrap(
-                                    spacing: 16,
+                                  TableRow(
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .surfaceContainerHighest,
+                                    ),
                                     children: [
-                                      Chip(label: Text('Solo in A: $onlyA'), backgroundColor: Colors.blue.withOpacity(0.2)),
-                                      Chip(label: Text('Solo in B: $onlyB'), backgroundColor: Colors.orange.withOpacity(0.2)),
-                                      Chip(label: Text('Valori diversi: $different'), backgroundColor: Colors.amber.withOpacity(0.2)),
+                                      _pad(const Text('Nome',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w600))),
+                                      _pad(const Text('Valore A',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w600))),
+                                      _pad(const Text('Valore B',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w600))),
+                                      _pad(const Text('Ambito',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w600))),
+                                      _pad(const Text('Stato',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w600))),
                                     ],
                                   ),
-                                  const SizedBox(height: 12),
-                                  SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
-                                    child: ConstrainedBox(
-                                      constraints: BoxConstraints(
-                                        // Usa tutta la larghezza disponibile del pannello,
-                                        // ma consenti comunque di allargare con lo scroll orizzontale se serve.
-                                        minWidth: screenWidth - 96, // 16 padding esterno + 16 interno card * 2 circa
-                                      ),
-                                      child: Table(
-                                      columnWidths: const <int, TableColumnWidth>{
-                                        0: FlexColumnWidth(1),
-                                        1: FlexColumnWidth(2),
-                                        2: FlexColumnWidth(2),
-                                        3: FlexColumnWidth(1.5),
-                                        4: FlexColumnWidth(1),
-                                      },
-                                      border: TableBorder.all(
-                                        color: Theme.of(context).dividerColor,
-                                        width: 0.5,
-                                      ),
-                                      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                                  ...diff.map((e) {
+                                    Color? rowColor;
+                                    String state = '';
+                                    if (e.onlyInA) {
+                                      rowColor = Colors.blue.withOpacity(0.1);
+                                      state = 'Solo A';
+                                    } else if (e.onlyInB) {
+                                      rowColor = Colors.orange.withOpacity(0.1);
+                                      state = 'Solo B';
+                                    } else if (e.different) {
+                                      rowColor = Colors.amber.withOpacity(0.1);
+                                      state = 'Diverso';
+                                    } else {
+                                      state = 'Uguale';
+                                    }
+                                    return TableRow(
+                                      decoration:
+                                          BoxDecoration(color: rowColor),
                                       children: [
-                                        TableRow(
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                          ),
-                                          children: [
-                                            _pad(const Text('Nome', style: TextStyle(fontWeight: FontWeight.w600))),
-                                            _pad(const Text('Valore A', style: TextStyle(fontWeight: FontWeight.w600))),
-                                            _pad(const Text('Valore B', style: TextStyle(fontWeight: FontWeight.w600))),
-                                            _pad(const Text('Ambito', style: TextStyle(fontWeight: FontWeight.w600))),
-                                            _pad(const Text('Stato', style: TextStyle(fontWeight: FontWeight.w600))),
-                                          ],
-                                        ),
-                                        ...diff.map((e) {
-                                          Color? rowColor;
-                                          String state = '';
-                                          if (e.onlyInA) {
-                                            rowColor = Colors.blue.withOpacity(0.1);
-                                            state = 'Solo A';
-                                          } else if (e.onlyInB) {
-                                            rowColor = Colors.orange.withOpacity(0.1);
-                                            state = 'Solo B';
-                                          } else if (e.different) {
-                                            rowColor = Colors.amber.withOpacity(0.1);
-                                            state = 'Diverso';
-                                          } else {
-                                            state = 'Uguale';
-                                          }
-                                          return TableRow(
-                                            decoration: BoxDecoration(color: rowColor),
-                                            children: [
-                                              _pad(SelectableText(
-                                                e.name,
-                                                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-                                                maxLines: 3,
-                                              )),
-                                              _pad(SelectableText(
-                                                e.valueA ?? '—',
-                                                maxLines: 4,
-                                                style: const TextStyle(fontSize: 12),
-                                              )),
-                                              _pad(SelectableText(
-                                                e.valueB ?? '—',
-                                                maxLines: 4,
-                                                style: const TextStyle(fontSize: 12),
-                                              )),
-                                              _pad(SelectableText(
-                                                e.scope,
-                                                maxLines: 3,
-                                                style: const TextStyle(fontSize: 12),
-                                              )),
-                                              _pad(Text(state, style: const TextStyle(fontSize: 12))),
-                                            ],
-                                          );
-                                        }),
+                                        _pad(SelectableText(
+                                          e.name,
+                                          style: const TextStyle(
+                                              fontFamily: 'monospace',
+                                              fontSize: 12),
+                                          maxLines: 3,
+                                        )),
+                                        _pad(SelectableText(
+                                          e.valueA ?? '—',
+                                          maxLines: 4,
+                                          style: const TextStyle(fontSize: 12),
+                                        )),
+                                        _pad(SelectableText(
+                                          e.valueB ?? '—',
+                                          maxLines: 4,
+                                          style: const TextStyle(fontSize: 12),
+                                        )),
+                                        _pad(SelectableText(
+                                          e.scope,
+                                          maxLines: 3,
+                                          style: const TextStyle(fontSize: 12),
+                                        )),
+                                        _pad(Text(state,
+                                            style:
+                                                const TextStyle(fontSize: 12))),
                                       ],
-                                    ),
-                                  ),
-                                  ),
+                                    );
+                                  }),
                                 ],
-                              );
-                            },
+                              ),
+                            ),
                           ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ],
               const SizedBox(height: 32),
@@ -1049,7 +1231,8 @@ class _ScrolledVariablesTable extends StatefulWidget {
   final double height;
 
   @override
-  State<_ScrolledVariablesTable> createState() => _ScrolledVariablesTableState();
+  State<_ScrolledVariablesTable> createState() =>
+      _ScrolledVariablesTableState();
 }
 
 class _ScrolledVariablesTableState extends State<_ScrolledVariablesTable> {
@@ -1098,7 +1281,8 @@ class _ScrolledVariablesTableState extends State<_ScrolledVariablesTable> {
           child: Scrollbar(
             controller: _horizontalController,
             thumbVisibility: true,
-            notificationPredicate: (notification) => notification.metrics.axis == Axis.horizontal,
+            notificationPredicate: (notification) =>
+                notification.metrics.axis == Axis.horizontal,
             child: _horizontalScroll(),
           ),
         ),
@@ -1156,7 +1340,8 @@ class _ScopeSelectDialogState extends State<_ScopeSelectDialog> {
           children: [
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Seleziona tutti', style: TextStyle(fontWeight: FontWeight.w600)),
+              title: const Text('Seleziona tutti',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
               value: selectAllValue,
               tristate: true,
               onChanged: (value) {

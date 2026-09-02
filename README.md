@@ -10,6 +10,7 @@ Versione Flutter dell'applicazione GitSnap per il confronto di ambienti SOURCE v
 - 💾 **Gestione progetti**: Salva e ricarica configurazioni
 - 🎨 **UI moderna**: Interfaccia Material Design 3
 - 🌓 **Tema chiaro/scuro**: Adattamento automatico al tema di sistema
+- 🔀 **Panoramica Pull Request**: Dashboard multi-repository con filtri, dettagli e link Azure DevOps
 
 ## Prerequisiti
 
@@ -49,23 +50,6 @@ flutter run -d linux    # Per Linux
 flutter build windows --release
 ```
 L'eseguibile si troverà in: `build/windows/runner/Release/gitsnap_flutter.exe`
-
-#### Creare il pacchetto di release Windows
-
-Dopo aver eseguito la build, lancia lo script PowerShell per creare il pacchetto distribuibile:
-
-```powershell
-.\scripts\create_release.ps1
-```
-
-Lo script:
-1. Legge la versione corrente da `assets/release/release_version.md` e la **incrementa automaticamente**
-2. Crea la cartella `assets/release/output/GitSnap_v<versione>_windows_x64`
-3. Copia tutto l'output di build da `build/windows/x64/runner/Release`
-4. Aggiunge il **Manuale Utente** (`assets/release/Manuale Utente GitSnap.pdf`)
-5. Aggiorna il numero di versione in `release_version.md`
-
-> ⚠️ Lo script deve essere eseguito **dopo** `flutter build windows --release`, altrimenti termina con errore.
 
 #### macOS
 ```bash
@@ -137,6 +121,14 @@ lib/
 - Clicca sull'icona cartella in alto
 - Aggiungi nuovi progetti per salvare configurazioni
 - Carica progetti salvati con un click
+
+### 7. Pull Request
+- Apri il tab **Pull request** per caricare le PR da tutti i repository del progetto configurato
+- La vista iniziale mostra PR aperte e bozze aggiornate negli ultimi 30 giorni
+- Filtra per stato, repository, autore, branch di destinazione, date e testo libero
+- Apri una riga per vedere reviewer, stato merge/policy, commit, file e discussioni
+- Usa l'icona di collegamento per aprire la PR in Azure DevOps
+- Il PAT deve avere permessi di lettura su **Code**
 
 ## Dati Salvati
 
