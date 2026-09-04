@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/azure_models.dart';
+import '../models/commit_search_models.dart';
 import '../models/pull_request_models.dart';
 import '../providers/app_state.dart';
 import '../services/pull_request_filter_service.dart';
@@ -48,85 +49,108 @@ class _PullRequestsTabState extends State<PullRequestsTab> {
       builder: (context, state, _) {
         final filter = state.pullRequestFilter;
         final pullRequests = state.filteredPullRequests;
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+        return DefaultTabController(
+          length: 2,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Pull request',
-                  style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 4),
-              Text(
-                'Panoramica delle pull request in tutti i repository del progetto configurato.',
-                style: Theme.of(context).textTheme.bodyMedium,
+              const TabBar(
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                tabs: [
+                  Tab(text: 'Panoramica PR'),
+                  Tab(text: 'Ricerca commit'),
+                ],
               ),
-              const SizedBox(height: 20),
-              _FilterPanel(
-                filter: filter,
-                state: state,
-                queryController: _queryController,
-                onChanged: _update,
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Pull request',
+                              style: Theme.of(context).textTheme.headlineSmall),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Panoramica delle pull request in tutti i repository del progetto configurato.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 20),
+                          _FilterPanel(
+                            filter: filter,
+                            state: state,
+                            queryController: _queryController,
+                            onChanged: _update,
+                          ),
+                          const SizedBox(height: 16),
+                          _StatusCards(
+                            filter: filter,
+                            counts: state.pullRequestStatusCounts,
+                            onToggle: (status) {
+                              final statuses = {...filter.statuses};
+                              statuses.contains(status)
+                                  ? statuses.remove(status)
+                                  : statuses.add(status);
+                              _update(filter.copyWith(statuses: statuses));
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final summary = _RepositorySummary(
+                                pullRequests: state.allPullRequests,
+                                filter: filter,
+                                currentUser: state.currentPullRequestUser,
+                                onSelect: (repositoryId) => _update(filter
+                                    .copyWith(repositoryIds: {repositoryId})),
+                              );
+                              final activity = _RecentPullRequestActivity(
+                                pullRequests: state.allPullRequests,
+                              );
+                              if (constraints.maxWidth < 1050) {
+                                return Column(
+                                  children: [
+                                    summary,
+                                    const SizedBox(height: 16),
+                                    activity,
+                                  ],
+                                );
+                              }
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(flex: 6, child: summary),
+                                  const SizedBox(width: 16),
+                                  Expanded(flex: 4, child: activity),
+                                ],
+                              );
+                            },
+                          ),
+                          if (state.pullRequestRepositoryErrors.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            _RepositoryWarning(
+                                errors: state.pullRequestRepositoryErrors),
+                          ],
+                          const SizedBox(height: 16),
+                          if (state.isLoadingPullRequests)
+                            const Center(
+                                child: Padding(
+                              padding: EdgeInsets.all(32),
+                              child: CircularProgressIndicator(),
+                            ))
+                          else if (state.errorMessage != null &&
+                              state.allPullRequests.isEmpty)
+                            _LoadError(message: state.errorMessage!)
+                          else
+                            _PullRequestTable(pullRequests: pullRequests),
+                        ],
+                      ),
+                    ),
+                    _CommitSearchView(state: state),
+                  ],
+                ),
               ),
-              const SizedBox(height: 16),
-              _StatusCards(
-                filter: filter,
-                counts: state.pullRequestStatusCounts,
-                onToggle: (status) {
-                  final statuses = {...filter.statuses};
-                  statuses.contains(status)
-                      ? statuses.remove(status)
-                      : statuses.add(status);
-                  _update(filter.copyWith(statuses: statuses));
-                },
-              ),
-              const SizedBox(height: 16),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final summary = _RepositorySummary(
-                    pullRequests: state.allPullRequests,
-                    filter: filter,
-                    currentUser: state.currentPullRequestUser,
-                    onSelect: (repositoryId) =>
-                        _update(filter.copyWith(repositoryIds: {repositoryId})),
-                  );
-                  final activity = _RecentPullRequestActivity(
-                    pullRequests: state.allPullRequests,
-                  );
-                  if (constraints.maxWidth < 1050) {
-                    return Column(
-                      children: [
-                        summary,
-                        const SizedBox(height: 16),
-                        activity,
-                      ],
-                    );
-                  }
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(flex: 6, child: summary),
-                      const SizedBox(width: 16),
-                      Expanded(flex: 4, child: activity),
-                    ],
-                  );
-                },
-              ),
-              if (state.pullRequestRepositoryErrors.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                _RepositoryWarning(errors: state.pullRequestRepositoryErrors),
-              ],
-              const SizedBox(height: 16),
-              if (state.isLoadingPullRequests)
-                const Center(
-                    child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: CircularProgressIndicator(),
-                ))
-              else if (state.errorMessage != null &&
-                  state.allPullRequests.isEmpty)
-                _LoadError(message: state.errorMessage!)
-              else
-                _PullRequestTable(pullRequests: pullRequests),
             ],
           ),
         );
@@ -866,6 +890,359 @@ class _StatusBadge extends StatelessWidget {
       label: Text(_statusLabel(status)),
       side: BorderSide(color: color.withValues(alpha: 0.65)),
       backgroundColor: color.withValues(alpha: 0.13),
+    );
+  }
+}
+
+class _CommitSearchView extends StatefulWidget {
+  final AppState state;
+
+  const _CommitSearchView({required this.state});
+
+  @override
+  State<_CommitSearchView> createState() => _CommitSearchViewState();
+}
+
+class _CommitSearchViewState extends State<_CommitSearchView> {
+  final _controller = TextEditingController();
+  late DateTime _from;
+  late DateTime _to;
+  Set<String> _branches = {'develop', 'master'};
+  Set<String> _branchPrefixes = {};
+  Set<String> _repositoryIds = {};
+  bool _allBranches = false;
+  bool _showAdvanced = false;
+  bool _expandFirstResult = true;
+  int _resultPanelStateVersion = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _to = DateTime.now();
+    _from = DateTime(_to.year - 1, _to.month, _to.day);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    final grouped = <String, List<CommitSearchResult>>{};
+    for (final result in state.commitSearchResults) {
+      grouped.putIfAbsent(result.repositoryName, () => []).add(result);
+    }
+    final selectedRepositoryCount = _repositoryIds.isEmpty
+        ? state.repositories.length
+        : _repositoryIds.length;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Ricerca commit',
+            style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 4),
+        const Text(
+            'Cerca una RF, un incidente o una stringa nei messaggi di commit.'),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 300,
+                    child: TextField(
+                      controller: _controller,
+                      decoration: const InputDecoration(
+                        labelText: 'RF333, INC12345 o testo commit',
+                        border: OutlineInputBorder(),
+                      ),
+                      onSubmitted: (_) => _search(),
+                    ),
+                  ),
+                  FilterChip(
+                    label: const Text('develop'),
+                    selected: _branches.contains('develop'),
+                    onSelected: _allBranches
+                        ? null
+                        : (selected) => setState(() {
+                              selected
+                                  ? _branches.add('develop')
+                                  : _branches.remove('develop');
+                            }),
+                  ),
+                  FilterChip(
+                    label: const Text('master'),
+                    selected: _branches.contains('master'),
+                    onSelected: _allBranches
+                        ? null
+                        : (selected) => setState(() {
+                              selected
+                                  ? _branches.add('master')
+                                  : _branches.remove('master');
+                            }),
+                  ),
+                  FilterChip(
+                    label: const Text('bugfix*'),
+                    selected: _branchPrefixes.contains('bugfix'),
+                    onSelected: _allBranches
+                        ? null
+                        : (selected) => setState(() {
+                              selected
+                                  ? _branchPrefixes.add('bugfix')
+                                  : _branchPrefixes.remove('bugfix');
+                            }),
+                  ),
+                  FilterChip(
+                    label: const Text('feature*'),
+                    selected: _branchPrefixes.contains('feature'),
+                    onSelected: _allBranches
+                        ? null
+                        : (selected) => setState(() {
+                              selected
+                                  ? _branchPrefixes.add('feature')
+                                  : _branchPrefixes.remove('feature');
+                            }),
+                  ),
+                  FilterChip(
+                    label: const Text('Tutte le branch'),
+                    selected: _allBranches,
+                    onSelected: (selected) =>
+                        setState(() => _allBranches = selected),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => _pickDate(true),
+                    child: Text('Da ${DateFormat('dd/MM/yyyy').format(_from)}'),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => _pickDate(false),
+                    child: Text('A ${DateFormat('dd/MM/yyyy').format(_to)}'),
+                  ),
+                  FilledButton.icon(
+                    onPressed: state.isSearchingCommits ? null : _search,
+                    icon: const Icon(Icons.search),
+                    label: const Text('Cerca'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () =>
+                        setState(() => _showAdvanced = !_showAdvanced),
+                    icon: Icon(
+                      _showAdvanced ? Icons.expand_less : Icons.tune_outlined,
+                    ),
+                    label: Text(_showAdvanced
+                        ? 'Nascondi dettagli'
+                        : 'Dettagli avanzati'),
+                  ),
+                  if (_showAdvanced)
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.folder_outlined),
+                      label: Text(_repositoryIds.isEmpty
+                          ? 'Tutti i repository'
+                          : '$selectedRepositoryCount repository'),
+                      onPressed: () async {
+                        final selection = await _selectSearchRepositories(
+                          state.repositories,
+                        );
+                        if (selection != null) {
+                          setState(() => _repositoryIds = selection);
+                        }
+                      },
+                    ),
+                ]),
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (state.isSearchingCommits)
+          const Center(child: CircularProgressIndicator())
+        else ...[
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _SearchMetricCard('Repository selezionati',
+                  selectedRepositoryCount, Icons.folder_outlined),
+              _SearchMetricCard('Repository analizzati',
+                  selectedRepositoryCount, Icons.manage_search),
+              _SearchMetricCard('Repository con match', grouped.length,
+                  Icons.rule_folder_outlined),
+              _SearchMetricCard('Commit trovati',
+                  state.commitSearchResults.length, Icons.commit),
+            ],
+          ),
+          if (state.commitSearchError != null) ...[
+            const SizedBox(height: 12),
+            Text(state.commitSearchError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ],
+          const SizedBox(height: 12),
+          if (grouped.isNotEmpty)
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: () => setState(() {
+                  _expandFirstResult = false;
+                  _resultPanelStateVersion++;
+                }),
+                icon: const Icon(Icons.unfold_less),
+                label: const Text('Comprimi tutti'),
+              ),
+            ),
+          if (grouped.isNotEmpty) const SizedBox(height: 8),
+          ...grouped.entries.toList().asMap().entries.map((groupEntry) {
+            final index = groupEntry.key;
+            final entry = groupEntry.value;
+            return Card(
+              child: ExpansionTile(
+                key: ValueKey(
+                  '${entry.key}-$_resultPanelStateVersion',
+                ),
+                initiallyExpanded: _expandFirstResult && index == 0,
+                title: Text(
+                  '${entry.key} · ${entry.value.length} commit',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                children: entry.value
+                    .map(
+                      (item) => ListTile(
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16),
+                        title: Text(
+                          '${item.commitId.substring(0, item.commitId.length > 8 ? 8 : item.commitId.length)} · ${item.message}',
+                        ),
+                        subtitle: Text(
+                          '${item.author} · ${item.date == null ? 'Data non disponibile' : DateFormat('dd/MM/yyyy HH:mm').format(item.date!.toLocal())} · ${item.branches.join(', ')}',
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.open_in_new),
+                          onPressed: item.webUrl.isEmpty
+                              ? null
+                              : () => launchUrl(Uri.parse(item.webUrl),
+                                  mode: LaunchMode.externalApplication),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            );
+          }),
+        ],
+      ]),
+    );
+  }
+
+  Future<void> _pickDate(bool from) async {
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: from ? _from : _to,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    if (selected != null)
+      setState(() => from ? _from = selected : _to = selected);
+  }
+
+  Future<Set<String>?> _selectSearchRepositories(
+      List<Repository> repositories) {
+    return showDialog<Set<String>>(
+      context: context,
+      builder: (dialogContext) {
+        var selected = {..._repositoryIds};
+        return StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: const Text('Repository da analizzare'),
+            content: SizedBox(
+              width: 440,
+              child: ListView(
+                shrinkWrap: true,
+                children: repositories
+                    .map((repository) => CheckboxListTile(
+                          value: selected.contains(repository.id),
+                          title: Text(repository.name),
+                          onChanged: (checked) => setDialogState(() {
+                            checked == true
+                                ? selected.add(repository.id)
+                                : selected.remove(repository.id);
+                          }),
+                        ))
+                    .toList(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => setDialogState(selected.clear),
+                child: const Text('Tutti'),
+              ),
+              TextButton(
+                onPressed: () => setDialogState(
+                  () => selected =
+                      repositories.map((repository) => repository.id).toSet(),
+                ),
+                child: const Text('Seleziona tutti'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Annulla'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, selected),
+                child: const Text('Applica'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _search() {
+    setState(() {
+      _expandFirstResult = true;
+      _resultPanelStateVersion++;
+    });
+    widget.state.searchCommits(
+      text: _controller.text,
+      repositoryIds: _repositoryIds,
+      branchNames: _branches,
+      branchPrefixes: _branchPrefixes,
+      allBranches: _allBranches,
+      from: _from,
+      to: _to,
+    );
+  }
+}
+
+class _SearchMetricCard extends StatelessWidget {
+  final String label;
+  final int value;
+  final IconData icon;
+
+  const _SearchMetricCard(this.label, this.value, this.icon);
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: SizedBox(
+        width: 175,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon,
+                  size: 18, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(height: 8),
+              Text(label, style: Theme.of(context).textTheme.bodySmall),
+              Text('$value', style: Theme.of(context).textTheme.headlineSmall),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

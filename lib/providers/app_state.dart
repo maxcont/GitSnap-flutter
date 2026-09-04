@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/azure_models.dart';
+import '../models/commit_search_models.dart';
 import '../models/pull_request_models.dart';
 import '../services/azure_devops_client.dart';
 import '../services/ref_resolver.dart';
@@ -37,6 +38,9 @@ class AppState extends ChangeNotifier {
   bool _isLoadingPullRequests = false;
   Map<String, String> _pullRequestRepositoryErrors = {};
   PullRequestIdentity? _currentPullRequestUser;
+  List<CommitSearchResult> _commitSearchResults = [];
+  bool _isSearchingCommits = false;
+  String? _commitSearchError;
 
   // Projects
   List<ProjectConfig> _projects = [];
@@ -65,6 +69,10 @@ class AppState extends ChangeNotifier {
   Map<String, String> get pullRequestRepositoryErrors =>
       Map.unmodifiable(_pullRequestRepositoryErrors);
   PullRequestIdentity? get currentPullRequestUser => _currentPullRequestUser;
+  List<CommitSearchResult> get commitSearchResults =>
+      List.unmodifiable(_commitSearchResults);
+  bool get isSearchingCommits => _isSearchingCommits;
+  String? get commitSearchError => _commitSearchError;
   List<PullRequestSummary> get filteredPullRequests =>
       PullRequestFilterService.filter(
         pullRequests: _allPullRequests,
@@ -267,6 +275,141 @@ class AppState extends ChangeNotifier {
     final metrics = await _client!
         .getPullRequestMetrics(pullRequest.repositoryId, pullRequest.id);
     return detail.copyWith(metrics: metrics);
+  }
+
+  Future<void> searchCommits({
+    required String text,
+    required Set<String> repositoryIds,
+    required Set<String> branchNames,
+    required Set<String> branchPrefixes,
+    required bool allBranches,
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    if (_client == null || text.trim().isEmpty) return;
+    _isSearchingCommits = true;
+    _commitSearchError = null;
+    _commitSearchResults = [];
+    notifyListeners();
+    try {
+      final repos = _repositories
+          .where((repo) =>
+              repositoryIds.isEmpty || repositoryIds.contains(repo.id))
+          .toList();
+      final matches = <String, CommitSearchResult>{};
+      final skippedBranches = <String>[];
+      final searchErrors = <String>[];
+      final availableBranchesByRepository = <String, Set<String>>{};
+      const concurrency = 5;
+
+      for (var index = 0; index < repos.length; index += concurrency) {
+        final chunk = repos.skip(index).take(concurrency);
+        final results = await Future.wait(chunk.map((repo) async {
+          try {
+            final branches = (await _client!.getBranches(repo.id))
+                .map((branch) => (branch['name'] as String? ?? '')
+                    .replaceFirst('refs/heads/', ''))
+                .where((branch) => branch.isNotEmpty)
+                .toSet();
+            return (repo: repo, branches: branches, error: null as Object?);
+          } catch (error) {
+            return (repo: repo, branches: <String>{}, error: error);
+          }
+        }));
+        for (final result in results) {
+          if (result.error != null) {
+            searchErrors.add(
+                '${result.repo.name}: impossibile leggere le branch (${result.error})');
+          } else {
+            availableBranchesByRepository[result.repo.id] = result.branches;
+          }
+        }
+      }
+
+      final requests = <({Repository repo, String branch})>[];
+      for (final repo in repos) {
+        final availableBranches = availableBranchesByRepository[repo.id];
+        if (availableBranches == null) continue;
+        final branches = allBranches
+            ? availableBranches
+            : availableBranches
+                .where((branch) =>
+                    branchNames.contains(branch) ||
+                    branchPrefixes.any(branch.startsWith))
+                .toSet();
+        final missingBranches = branchNames.difference(availableBranches);
+        if (!allBranches && missingBranches.isNotEmpty) {
+          skippedBranches.add('${repo.name}: ${missingBranches.join(', ')}');
+        }
+        for (final branch in branches) {
+          requests.add((repo: repo, branch: branch));
+        }
+      }
+
+      final normalizedText = text.toLowerCase();
+      for (var index = 0; index < requests.length; index += concurrency) {
+        final chunk = requests.skip(index).take(concurrency);
+        final results = await Future.wait(chunk.map((request) async {
+          try {
+            final commits = await _client!.getCommitsForBranch(
+              request.repo.id,
+              request.branch,
+              from: from,
+              to: to,
+            );
+            return (request: request, commits: commits, error: null as Object?);
+          } catch (error) {
+            return (request: request, commits: <Commit>[], error: error);
+          }
+        }));
+        for (final result in results) {
+          if (result.error != null) {
+            searchErrors.add(
+              '${result.request.repo.name}/${result.request.branch}: ${result.error}',
+            );
+            continue;
+          }
+          for (final commit in result.commits.where((commit) =>
+              commit.comment?.toLowerCase().contains(normalizedText) ??
+              false)) {
+            final repo = result.request.repo;
+            final branch = result.request.branch;
+            final key = '${repo.id}:${commit.commitId}';
+            final existing = matches[key];
+            matches[key] = existing?.addBranch(branch) ??
+                CommitSearchResult(
+                  repositoryId: repo.id,
+                  repositoryName: repo.name,
+                  commitId: commit.commitId,
+                  message: commit.comment ?? '',
+                  author: commit.author?.name ?? '',
+                  date: commit.date == null
+                      ? null
+                      : DateTime.tryParse(commit.date!),
+                  branches: {branch},
+                  webUrl: '${repo.remoteUrl ?? ''}/commit/${commit.commitId}',
+                );
+          }
+        }
+      }
+      _commitSearchResults = matches.values.toList()
+        ..sort((left, right) => (right.date ?? DateTime(1970))
+            .compareTo(left.date ?? DateTime(1970)));
+      final warnings = <String>[
+        if (skippedBranches.isNotEmpty)
+          'Branch non presenti e ignorate: ${skippedBranches.join(' · ')}',
+        if (searchErrors.isNotEmpty)
+          'Problemi durante l' 'analisi: ${searchErrors.join(' · ')}',
+      ];
+      if (warnings.isNotEmpty) {
+        _commitSearchError = warnings.join('\n');
+      }
+    } catch (error) {
+      _commitSearchError = 'Errore durante la ricerca commit: $error';
+    } finally {
+      _isSearchingCommits = false;
+      notifyListeners();
+    }
   }
 
   // Run comparison

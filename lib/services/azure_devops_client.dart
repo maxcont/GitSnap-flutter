@@ -314,6 +314,7 @@ class AzureDevOpsClient {
           'Failed to fetch commits: ${response.statusCode}',
         );
       }
+
       final data = json.decode(response.body);
       final commitList = data['value'] as List?;
       if (commitList == null) return [];
@@ -321,6 +322,35 @@ class AzureDevOpsClient {
     } catch (e) {
       throw AzureDevOpsClientError('Error fetching commits: $e');
     }
+  }
+
+  Future<List<Commit>> getCommitsForBranch(
+    String repositoryId,
+    String branchName, {
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final url = Uri.parse('$_apiBase/git/repositories/$repositoryId/commits')
+        .replace(queryParameters: {
+      'api-version': '7.0',
+      r'$top': '2000',
+      'searchCriteria.itemVersion.version': branchName,
+      'searchCriteria.itemVersion.versionType': 'branch',
+      'searchCriteria.fromDate': from.toUtc().toIso8601String(),
+      'searchCriteria.toDate': to.toUtc().toIso8601String(),
+    });
+    final response = await http.get(url, headers: _headers);
+    if (response.statusCode != 200) {
+      throw AzureDevOpsClientError(
+        'Failed to fetch commits: ${response.statusCode}. '
+        '${_messageForStatus(response.statusCode, response.body)}',
+      );
+    }
+    final data = json.decode(response.body) as Map<String, dynamic>;
+    return (data['value'] as List? ?? const [])
+        .whereType<Map>()
+        .map((value) => Commit.fromJson(Map<String, dynamic>.from(value)))
+        .toList();
   }
 
   /// Result of diffs/commits API: commit count (aheadCount) and file list from the same response (like Streamlit).
