@@ -41,6 +41,9 @@ class AppState extends ChangeNotifier {
   List<CommitSearchResult> _commitSearchResults = [];
   bool _isSearchingCommits = false;
   String? _commitSearchError;
+  String _commitSearchPhase = '';
+  int _commitSearchCompleted = 0;
+  int _commitSearchTotal = 0;
 
   // Projects
   List<ProjectConfig> _projects = [];
@@ -73,6 +76,9 @@ class AppState extends ChangeNotifier {
       List.unmodifiable(_commitSearchResults);
   bool get isSearchingCommits => _isSearchingCommits;
   String? get commitSearchError => _commitSearchError;
+  String get commitSearchPhase => _commitSearchPhase;
+  int get commitSearchCompleted => _commitSearchCompleted;
+  int get commitSearchTotal => _commitSearchTotal;
   List<PullRequestSummary> get filteredPullRequests =>
       PullRequestFilterService.filter(
         pullRequests: _allPullRequests,
@@ -282,6 +288,7 @@ class AppState extends ChangeNotifier {
     required Set<String> repositoryIds,
     required Set<String> branchNames,
     required Set<String> branchPrefixes,
+    required String? branchPattern,
     required bool allBranches,
     required DateTime from,
     required DateTime to,
@@ -290,6 +297,9 @@ class AppState extends ChangeNotifier {
     _isSearchingCommits = true;
     _commitSearchError = null;
     _commitSearchResults = [];
+    _commitSearchPhase = 'Preparazione della ricerca';
+    _commitSearchCompleted = 0;
+    _commitSearchTotal = 0;
     notifyListeners();
     try {
       final repos = _repositories
@@ -301,6 +311,10 @@ class AppState extends ChangeNotifier {
       final searchErrors = <String>[];
       final availableBranchesByRepository = <String, Set<String>>{};
       const concurrency = 5;
+      _commitSearchPhase = 'Lettura branch dei repository';
+      _commitSearchCompleted = 0;
+      _commitSearchTotal = repos.length;
+      notifyListeners();
 
       for (var index = 0; index < repos.length; index += concurrency) {
         final chunk = repos.skip(index).take(concurrency);
@@ -324,8 +338,18 @@ class AppState extends ChangeNotifier {
             availableBranchesByRepository[result.repo.id] = result.branches;
           }
         }
+        _commitSearchCompleted += results.length;
+        notifyListeners();
       }
 
+      final normalizedBranchPattern = branchPattern?.trim();
+      final branchPatternRegex =
+          normalizedBranchPattern == null || normalizedBranchPattern.isEmpty
+              ? null
+              : RegExp(
+                  '^${RegExp.escape(normalizedBranchPattern).replaceAll(r'\*', '.*')}\$',
+                  caseSensitive: false,
+                );
       final requests = <({Repository repo, String branch})>[];
       for (final repo in repos) {
         final availableBranches = availableBranchesByRepository[repo.id];
@@ -335,7 +359,8 @@ class AppState extends ChangeNotifier {
             : availableBranches
                 .where((branch) =>
                     branchNames.contains(branch) ||
-                    branchPrefixes.any(branch.startsWith))
+                    branchPrefixes.any(branch.startsWith) ||
+                    branchPatternRegex?.hasMatch(branch) == true)
                 .toSet();
         final missingBranches = branchNames.difference(availableBranches);
         if (!allBranches && missingBranches.isNotEmpty) {
@@ -347,6 +372,10 @@ class AppState extends ChangeNotifier {
       }
 
       final normalizedText = text.toLowerCase();
+      _commitSearchPhase = 'Ricerca nei messaggi dei commit';
+      _commitSearchCompleted = 0;
+      _commitSearchTotal = requests.length;
+      notifyListeners();
       for (var index = 0; index < requests.length; index += concurrency) {
         final chunk = requests.skip(index).take(concurrency);
         final results = await Future.wait(chunk.map((request) async {
@@ -391,6 +420,8 @@ class AppState extends ChangeNotifier {
                 );
           }
         }
+        _commitSearchCompleted += results.length;
+        notifyListeners();
       }
       _commitSearchResults = matches.values.toList()
         ..sort((left, right) => (right.date ?? DateTime(1970))

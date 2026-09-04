@@ -909,6 +909,7 @@ class _CommitSearchViewState extends State<_CommitSearchView> {
   late DateTime _to;
   Set<String> _branches = {'develop', 'master'};
   Set<String> _branchPrefixes = {};
+  String? _customBranchPattern;
   Set<String> _repositoryIds = {};
   bool _allBranches = false;
   bool _showAdvanced = false;
@@ -1010,6 +1011,15 @@ class _CommitSearchViewState extends State<_CommitSearchView> {
                                   : _branchPrefixes.remove('feature');
                             }),
                   ),
+                  InputChip(
+                    label:
+                        Text(_customBranchPattern ?? 'Branch personalizzata'),
+                    selected: _customBranchPattern != null,
+                    onPressed: _allBranches ? null : _editCustomBranchPattern,
+                    onDeleted: _customBranchPattern == null
+                        ? null
+                        : () => setState(() => _customBranchPattern = null),
+                  ),
                   FilterChip(
                     label: const Text('Tutte le branch'),
                     selected: _allBranches,
@@ -1059,7 +1069,11 @@ class _CommitSearchViewState extends State<_CommitSearchView> {
         ),
         const SizedBox(height: 16),
         if (state.isSearchingCommits)
-          const Center(child: CircularProgressIndicator())
+          _CommitSearchProgress(
+            phase: state.commitSearchPhase,
+            completed: state.commitSearchCompleted,
+            total: state.commitSearchTotal,
+          )
         else ...[
           Wrap(
             spacing: 12,
@@ -1210,9 +1224,100 @@ class _CommitSearchViewState extends State<_CommitSearchView> {
       repositoryIds: _repositoryIds,
       branchNames: _branches,
       branchPrefixes: _branchPrefixes,
+      branchPattern: _customBranchPattern,
       allBranches: _allBranches,
       from: _from,
       to: _to,
+    );
+  }
+
+  Future<void> _editCustomBranchPattern() async {
+    final controller = TextEditingController(text: _customBranchPattern);
+    final pattern = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Branch personalizzata'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Pattern branch',
+            hintText: '*testolibero*',
+            helperText: 'Usa * come carattere jolly.',
+            border: OutlineInputBorder(),
+          ),
+          onSubmitted: (value) => Navigator.pop(dialogContext, value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Annulla'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
+            child: const Text('Applica'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (pattern == null) return;
+    final trimmedPattern = pattern.trim();
+    setState(() {
+      _customBranchPattern = trimmedPattern.isEmpty ? null : trimmedPattern;
+    });
+  }
+}
+
+class _CommitSearchProgress extends StatelessWidget {
+  final String phase;
+  final int completed;
+  final int total;
+
+  const _CommitSearchProgress({
+    required this.phase,
+    required this.completed,
+    required this.total,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasTotal = total > 0;
+    final progress = hasTotal ? completed / total : null;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    phase,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            LinearProgressIndicator(value: progress),
+            const SizedBox(height: 8),
+            Text(
+              hasTotal
+                  ? '$completed di $total ${phase.startsWith('Lettura') ? 'repository' : 'branch'} analizzati'
+                  : 'Preparazione delle richieste verso Azure DevOps...',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
