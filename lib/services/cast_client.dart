@@ -65,6 +65,12 @@ class CastClient {
       if (html.trim().isEmpty) {
         throw CastClientError('CAST ha restituito una pagina vuota.');
       }
+      if (!looksAuthenticated(html)) {
+        throw CastClientError(
+          'Non risulta autenticato su CAST. Vai su Configurazione e premi '
+          '"Rilogga CAST", poi riprova.',
+        );
+      }
       return rows;
     } on CastClientError {
       rethrow;
@@ -89,6 +95,21 @@ class CastClient {
   /// "ProgConf-FE-ZAC" -> "ProgConfFEZAC").
   static String castComponentName(String repositoryName) =>
       repositoryName.replaceAll(RegExp(r'[-\s]'), '');
+
+  /// Returns whether [html] looks like an actual, authenticated CAST
+  /// component page, rather than a login/SSO page or an access-denied
+  /// response.
+  ///
+  /// When the WebView2 session isn't authenticated (e.g. the NTLM/Windows
+  /// Integrated Auth ticket expired, or the user hasn't logged in yet), the
+  /// portal serves a different page instead of the component report, which
+  /// would otherwise be silently misread as "build not found". Both the
+  /// "CAST: <component>" page title and the `table-cast` history table are
+  /// always present on a real component page (even with zero scans, the
+  /// table skeleton with its headers is still rendered), so their absence
+  /// is a reliable signal that we're not actually logged in.
+  static bool looksAuthenticated(String html) =>
+      html.contains('table-cast') || html.contains('class="page-title"');
 
   /// Parses the CAST component history HTML table
   /// (`table.table-cast`/`table-condensed`) into a list of

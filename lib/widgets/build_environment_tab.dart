@@ -36,7 +36,8 @@ class _ComboSearch {
   });
 }
 
-class _BuildEnvironmentTabState extends State<BuildEnvironmentTab> {
+class _BuildEnvironmentTabState extends State<BuildEnvironmentTab>
+    with AutomaticKeepAliveClientMixin<BuildEnvironmentTab> {
   final List<_QueryRow> _rows = [_QueryRow()];
   DateTime? _fromDate;
   DateTime? _toDate;
@@ -46,6 +47,15 @@ class _BuildEnvironmentTabState extends State<BuildEnvironmentTab> {
   final Map<String, CastBuildRating?> _castRatings = {};
   final Map<String, String> _castErrors = {};
   final Set<String> _castLoading = {};
+
+  // Without this, switching to a tab several positions away (e.g. from
+  // "Verifica build" to "Confronto repository") can make Flutter's
+  // TabBarView dispose this tab's state entirely once it's outside the
+  // page cache extent, silently clearing the rows/results/CAST ratings the
+  // user had already set up. Keeping it alive preserves everything across
+  // tab switches.
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void dispose() {
@@ -182,6 +192,7 @@ class _BuildEnvironmentTabState extends State<BuildEnvironmentTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final appState = context.watch<AppState>();
     return _buildMainContent(context, appState);
   }

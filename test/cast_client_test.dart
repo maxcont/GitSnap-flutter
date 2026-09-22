@@ -101,13 +101,45 @@ void main() {
     });
 
     test('parses a real CAST component page fixture and finds the build', () {
-      final html = File('test/fixtures/cast_sample_page.html').readAsStringSync();
+      final html =
+          File('test/fixtures/cast_sample_page.html').readAsStringSync();
       final rows = CastClient.parseHistoryTable(html);
 
       expect(rows, isNotEmpty);
       final match = CastClient.findExactBuild(rows, '2.0.26264.01');
       expect(match, isNotNull);
       expect(match!.rating, 'A');
+    });
+  });
+
+  group('looksAuthenticated', () {
+    test('is true for a real, authenticated CAST component page', () {
+      final html =
+          File('test/fixtures/cast_sample_page.html').readAsStringSync();
+      expect(CastClient.looksAuthenticated(html), isTrue);
+    });
+
+    test('is false for a login/SSO page without the CAST report markup', () {
+      const loginHtml = '''
+<!DOCTYPE html>
+<html>
+<body>
+  <h1>Accedi</h1>
+  <form action="/login" method="post">
+    <input type="text" name="username" />
+    <input type="password" name="password" />
+    <button type="submit">Login</button>
+  </form>
+</body>
+</html>
+''';
+      expect(CastClient.looksAuthenticated(loginHtml), isFalse);
+    });
+
+    test('is false for an empty or unrelated page', () {
+      expect(
+          CastClient.looksAuthenticated('<html><body>Not found</body></html>'),
+          isFalse);
     });
   });
 
