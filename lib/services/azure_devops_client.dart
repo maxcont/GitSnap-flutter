@@ -551,8 +551,11 @@ class AzureDevOpsClient {
   /// Keys include scope so the same name in different environments is preserved.
   static Map<String, ReleaseVariable> parseVariablesFromDefinition(
       Map<String, dynamic> data) {
+    final definition = _extractDefinitionPayload(data);
+    if (definition == null) return {};
+
     final out = <String, ReleaseVariable>{};
-    final envs = data['environments'] as List?;
+    final envs = definition['environments'] as List?;
     if (envs != null) {
       for (final e in envs) {
         final env = e is Map ? e as Map<String, dynamic> : null;
@@ -562,7 +565,7 @@ class AzureDevOpsClient {
         if (vars != null) _addVarsFromMap(vars, out, scope: scope);
       }
     }
-    final rootVars = data['variables'] as Map?;
+    final rootVars = definition['variables'] as Map?;
     if (rootVars != null) {
       _addVarsFromMap(rootVars, out, scope: ReleaseVariable.releaseScope);
     }
@@ -572,6 +575,53 @@ class AzureDevOpsClient {
   static Map<String, ReleaseVariable> _parseVariablesFromDefinition(
           Map<String, dynamic> data) =>
       parseVariablesFromDefinition(data);
+
+  static Map<String, dynamic>? _extractDefinitionPayload(
+      Map<String, dynamic> data) {
+    if (_isDefinitionCandidate(data)) return data;
+
+    final candidates = <Map<String, dynamic>>[];
+    _collectDefinitionCandidates(data, candidates);
+    if (candidates.isEmpty) return null;
+    candidates.sort((a, b) =>
+        _definitionCandidateScore(b).compareTo(_definitionCandidateScore(a)));
+    return candidates.first;
+  }
+
+  static void _collectDefinitionCandidates(
+    dynamic node,
+    List<Map<String, dynamic>> out,
+  ) {
+    if (node is Map) {
+      final map = Map<String, dynamic>.from(node);
+      if (_isDefinitionCandidate(map)) out.add(map);
+      for (final value in map.values) {
+        _collectDefinitionCandidates(value, out);
+      }
+      return;
+    }
+    if (node is List) {
+      for (final value in node) {
+        _collectDefinitionCandidates(value, out);
+      }
+    }
+  }
+
+  static bool _isDefinitionCandidate(Map<String, dynamic> map) =>
+      map['variables'] is Map || map['environments'] is List;
+
+  static int _definitionCandidateScore(Map<String, dynamic> map) {
+    var score = 0;
+    final envs = map['environments'];
+    final vars = map['variables'];
+    if (envs is List) score += 100 + envs.length;
+    if (vars is Map) score += 50 + vars.length;
+    if (map['id'] != null) score += 5;
+    if (map['name'] != null) score += 2;
+    if (map['path'] != null) score += 2;
+    if (map['source'] != null) score += 2;
+    return score;
+  }
 
   static void _addVarsFromMap(
     dynamic vars,

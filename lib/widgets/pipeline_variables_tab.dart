@@ -25,7 +25,15 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
   String? _folderPath;
   final TextEditingController _patternController = TextEditingController();
   final TextEditingController _filterController = TextEditingController();
+  final TextEditingController _variablesFilterAController =
+      TextEditingController();
+  final TextEditingController _variablesFilterBController =
+      TextEditingController();
+  final TextEditingController _diffFilterController = TextEditingController();
   String _filterQuery = '';
+  String _variablesFilterQueryA = '';
+  String _variablesFilterQueryB = '';
+  String _diffFilterQuery = '';
   bool _expandCarica = true;
   bool _expandVariabiliA = true;
   bool _expandVariabiliB = true;
@@ -66,6 +74,12 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
       _variablesB = {};
       _selectedScopesA = {};
       _selectedScopesB = {};
+      _variablesFilterQueryA = '';
+      _variablesFilterQueryB = '';
+      _diffFilterQuery = '';
+      _variablesFilterAController.clear();
+      _variablesFilterBController.clear();
+      _diffFilterController.clear();
       _singlePanelFullWidth = false;
     });
     try {
@@ -176,6 +190,9 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
   void dispose() {
     _patternController.dispose();
     _filterController.dispose();
+    _variablesFilterAController.dispose();
+    _variablesFilterBController.dispose();
+    _diffFilterController.dispose();
     super.dispose();
   }
 
@@ -264,17 +281,26 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
   List<ReleaseVariable> _filteredVariables(
     Map<String, ReleaseVariable> vars,
     Set<String> selectedScopes,
+    String query,
   ) {
     final sorted = _sortedVariables(vars);
     final allScopes = _sortedScopesFor(vars);
-    if (allScopes.isEmpty) return sorted;
-    if (selectedScopes.length >= allScopes.length) return sorted;
-    if (selectedScopes.isEmpty) return [];
-    return sorted.where((v) => selectedScopes.contains(v.scope)).toList();
+    final scoped = allScopes.isEmpty
+        ? sorted
+        : selectedScopes.length >= allScopes.length
+            ? sorted
+            : selectedScopes.isEmpty
+                ? <ReleaseVariable>[]
+                : sorted
+                    .where((v) => selectedScopes.contains(v.scope))
+                    .toList();
+    return _filterVariablesByQuery(scoped, query);
   }
 
   List<VariableDiffEntry> _filteredDiffForComparison(
-      List<VariableDiffEntry> diff) {
+    List<VariableDiffEntry> diff,
+    String query,
+  ) {
     final scopesA = _sortedScopesFor(_variablesA).toSet();
     final scopesB = _sortedScopesFor(_variablesB).toSet();
     final visibleA =
@@ -282,8 +308,10 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     final visibleB =
         _selectedScopesB.length >= scopesB.length ? scopesB : _selectedScopesB;
     final visibleScopes = {...visibleA, ...visibleB};
-    if (visibleScopes.isEmpty) return [];
-    return diff.where((e) => visibleScopes.contains(e.scope)).toList();
+    final scoped = visibleScopes.isEmpty
+        ? <VariableDiffEntry>[]
+        : diff.where((e) => visibleScopes.contains(e.scope)).toList();
+    return _filterDiffByQuery(scoped, query);
   }
 
   String _scopeSelectorSummary(List<String> scopes, Set<String> selected) {
@@ -452,9 +480,9 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
       Map<String, ReleaseVariable> vars) {
     final list = vars.values.toList()
       ..sort((a, b) {
-        final byName = a.name.compareTo(b.name);
+        final byName = _compareAlpha(a.name, b.name);
         if (byName != 0) return byName;
-        return a.scope.compareTo(b.scope);
+        return _compareAlpha(a.scope, b.scope);
       });
     return list;
   }
@@ -486,9 +514,9 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
       );
     }).toList()
       ..sort((x, y) {
-        final byName = x.name.compareTo(y.name);
+        final byName = _compareAlpha(x.name, y.name);
         if (byName != 0) return byName;
-        return x.scope.compareTo(y.scope);
+        return _compareAlpha(x.scope, y.scope);
       });
   }
 
@@ -496,14 +524,72 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     String label,
     Map<String, ReleaseVariable> vars,
     Set<String> selectedScopes,
+    String query,
   ) {
-    final filtered = _filteredVariables(vars, selectedScopes).length;
+    final filtered = _filteredVariables(vars, selectedScopes, query).length;
     final total = vars.length;
+    final hasQuery = query.trim().isNotEmpty;
     final allScopes = _sortedScopesFor(vars);
-    if (selectedScopes.length >= allScopes.length || filtered == total) {
+    final allScopesSelected = selectedScopes.length >= allScopes.length;
+    if (!hasQuery && (allScopesSelected || filtered == total)) {
       return '$label ($total)';
     }
     return '$label ($filtered di $total)';
+  }
+
+  static int _compareAlpha(String a, String b) {
+    final byLower = a.toLowerCase().compareTo(b.toLowerCase());
+    if (byLower != 0) return byLower;
+    return a.compareTo(b);
+  }
+
+  static List<ReleaseVariable> _filterVariablesByQuery(
+    List<ReleaseVariable> variables,
+    String query,
+  ) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return variables;
+    return variables.where((v) {
+      return v.name.toLowerCase().contains(q) ||
+          v.scope.toLowerCase().contains(q) ||
+          v.value.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  static List<VariableDiffEntry> _filterDiffByQuery(
+    List<VariableDiffEntry> diff,
+    String query,
+  ) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return diff;
+    return diff.where((e) {
+      return e.name.toLowerCase().contains(q) ||
+          e.scope.toLowerCase().contains(q) ||
+          (e.valueA ?? '').toLowerCase().contains(q) ||
+          (e.valueB ?? '').toLowerCase().contains(q);
+    }).toList();
+  }
+
+  Widget _searchField({
+    required TextEditingController controller,
+    required String hintText,
+    required ValueChanged<String> onChanged,
+  }) {
+    return SizedBox(
+      width: 320,
+      child: TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          hintText: hintText,
+          prefixIcon: const Icon(Icons.search, size: 20),
+          isDense: true,
+          border: const OutlineInputBorder(),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        ),
+        onChanged: onChanged,
+      ),
+    );
   }
 
   static List<DataRow> _variableRows(List<ReleaseVariable> variables) {
@@ -784,6 +870,11 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                                   _revisionsA = [];
                                                   _variablesA = {};
                                                   _selectedScopesA = {};
+                                                  _variablesFilterQueryA = '';
+                                                  _variablesFilterAController
+                                                      .clear();
+                                                  _diffFilterQuery = '';
+                                                  _diffFilterController.clear();
                                                   if (!_isSinglePipelineView)
                                                     _singlePanelFullWidth =
                                                         false;
@@ -810,6 +901,11 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                                   _revisionsB = [];
                                                   _variablesB = {};
                                                   _selectedScopesB = {};
+                                                  _variablesFilterQueryB = '';
+                                                  _variablesFilterBController
+                                                      .clear();
+                                                  _diffFilterQuery = '';
+                                                  _diffFilterController.clear();
                                                   if (!_isSinglePipelineView)
                                                     _singlePanelFullWidth =
                                                         false;
@@ -912,10 +1008,21 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                     setState(() => _selectedScopesA = scopes),
                               ),
                               const SizedBox(height: 12),
+                              _searchField(
+                                controller: _variablesFilterAController,
+                                hintText:
+                                    'Cerca variabili A (nome, valore, ambito)…',
+                                onChanged: (v) =>
+                                    setState(() => _variablesFilterQueryA = v),
+                              ),
+                              const SizedBox(height: 12),
                               _variablesToolbar(
                                 context,
-                                countLabel: _variablesCountLabel('Variabili A',
-                                    _variablesA, _selectedScopesA),
+                                countLabel: _variablesCountLabel(
+                                    'Variabili A',
+                                    _variablesA,
+                                    _selectedScopesA,
+                                    _variablesFilterQueryA),
                                 fullHeight: _varsPanelAFullHeight,
                                 onToggleHeight: () => setState(() =>
                                     _varsPanelAFullHeight =
@@ -929,8 +1036,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                               ),
                               const SizedBox(height: 6),
                               _variablesTable(
-                                _filteredVariables(
-                                    _variablesA, _selectedScopesA),
+                                _filteredVariables(_variablesA,
+                                    _selectedScopesA, _variablesFilterQueryA),
                                 fullHeight: _varsPanelAFullHeight,
                                 fullWidth: _isSinglePipelineView &&
                                     _singlePanelFullWidth,
@@ -1009,10 +1116,21 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                                     setState(() => _selectedScopesB = scopes),
                               ),
                               const SizedBox(height: 12),
+                              _searchField(
+                                controller: _variablesFilterBController,
+                                hintText:
+                                    'Cerca variabili B (nome, valore, ambito)…',
+                                onChanged: (v) =>
+                                    setState(() => _variablesFilterQueryB = v),
+                              ),
+                              const SizedBox(height: 12),
                               _variablesToolbar(
                                 context,
-                                countLabel: _variablesCountLabel('Variabili B',
-                                    _variablesB, _selectedScopesB),
+                                countLabel: _variablesCountLabel(
+                                    'Variabili B',
+                                    _variablesB,
+                                    _selectedScopesB,
+                                    _variablesFilterQueryB),
                                 fullHeight: _varsPanelBFullHeight,
                                 onToggleHeight: () => setState(() =>
                                     _varsPanelBFullHeight =
@@ -1026,8 +1144,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                               ),
                               const SizedBox(height: 6),
                               _variablesTable(
-                                _filteredVariables(
-                                    _variablesB, _selectedScopesB),
+                                _filteredVariables(_variablesB,
+                                    _selectedScopesB, _variablesFilterQueryB),
                                 fullHeight: _varsPanelBFullHeight,
                                 fullWidth: _isSinglePipelineView &&
                                     _singlePanelFullWidth,
@@ -1079,7 +1197,9 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                   child: Builder(
                     builder: (context) {
                       final diff = _filteredDiffForComparison(
-                          _computeDiff(_variablesA, _variablesB));
+                        _computeDiff(_variablesA, _variablesB),
+                        _diffFilterQuery,
+                      );
                       final onlyA = diff.where((e) => e.onlyInA).length;
                       final onlyB = diff.where((e) => e.onlyInB).length;
                       final different = diff.where((e) => e.different).length;
@@ -1087,6 +1207,14 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          _searchField(
+                            controller: _diffFilterController,
+                            hintText:
+                                'Cerca nel confronto (nome, valore, ambito)…',
+                            onChanged: (v) =>
+                                setState(() => _diffFilterQuery = v),
+                          ),
+                          const SizedBox(height: 12),
                           Wrap(
                             spacing: 16,
                             children: [
