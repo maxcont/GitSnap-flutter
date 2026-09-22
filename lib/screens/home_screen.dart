@@ -8,6 +8,7 @@ import '../widgets/results_dashboard.dart';
 import '../widgets/projects_sidebar.dart';
 import '../widgets/pipeline_variables_tab.dart';
 import '../widgets/pull_requests_tab.dart';
+import '../widgets/build_environment_tab.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -15,7 +16,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: FittedBox(
@@ -44,6 +45,7 @@ class HomeScreen extends StatelessWidget {
                   icon: Icon(Icons.compare_arrows)),
               Tab(text: 'Utility pipeline', icon: Icon(Icons.build)),
               Tab(text: 'Pull request', icon: Icon(Icons.call_split)),
+              Tab(text: 'Verifica build', icon: Icon(Icons.rocket_launch)),
             ],
           ),
           actions: [
@@ -80,6 +82,7 @@ class HomeScreen extends StatelessWidget {
             _ComparisonTab(),
             const PipelineVariablesTab(),
             const PullRequestsTab(),
+            const BuildEnvironmentTab(),
           ],
         ),
       ),
