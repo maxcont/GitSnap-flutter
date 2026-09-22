@@ -508,6 +508,38 @@ class AzureDevOpsClient {
       ..sort((a, b) => b.compareTo(a));
   }
 
+  /// List releases for a release definition, optionally restricted to a
+  /// creation date range. Includes artifacts and environments so callers
+  /// can determine the deployed build version and its outcome.
+  Future<List<ReleaseSummary>> getReleases(
+    int definitionId, {
+    DateTime? minCreatedTime,
+    DateTime? maxCreatedTime,
+    int top = 50,
+  }) async {
+    final q = <String, String>{
+      'definitionId': '$definitionId',
+      r'$expand': 'artifacts,environments',
+      'queryOrder': 'descending',
+      r'$top': '$top',
+      'api-version': '7.0',
+    };
+    if (minCreatedTime != null) {
+      q['minCreatedTime'] = minCreatedTime.toUtc().toIso8601String();
+    }
+    if (maxCreatedTime != null) {
+      q['maxCreatedTime'] = maxCreatedTime.toUtc().toIso8601String();
+    }
+    final url =
+        Uri.parse('$_releaseBase/releases').replace(queryParameters: q);
+    final response = await http.get(url, headers: _headers);
+    if (response.statusCode != 200) {
+      throw AzureDevOpsClientError('Releases: ${response.statusCode}');
+    }
+    final data = json.decode(response.body) as Map<String, dynamic>;
+    return parseReleasesFromResponse(data);
+  }
+
   /// Get release definition at a specific revision (includes variables)
   Future<Map<String, ReleaseVariable>> getVariablesAtRevision(
     int definitionId,
