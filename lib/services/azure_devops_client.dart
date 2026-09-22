@@ -646,4 +646,53 @@ class AzureDevOpsClient {
       out[variable.mapKey] = variable;
     }
   }
+
+  /// Parse the JSON body of `GET .../release/releases` (with
+  /// `$expand=artifacts,environments`) into a list of [ReleaseSummary].
+  static List<ReleaseSummary> parseReleasesFromResponse(
+      Map<String, dynamic> data) {
+    final list = data['value'] as List?;
+    if (list == null) return [];
+    return list.map((e) {
+      final m = Map<String, dynamic>.from(e as Map);
+
+      var artifactVersion = '';
+      final artifacts = m['artifacts'] as List?;
+      if (artifacts != null && artifacts.isNotEmpty) {
+        final firstArtifact =
+            Map<String, dynamic>.from(artifacts.first as Map);
+        final defRef = firstArtifact['definitionReference'];
+        if (defRef is Map) {
+          final version = defRef['version'];
+          if (version is Map) {
+            artifactVersion = version['name']?.toString() ?? '';
+          }
+        }
+      }
+
+      var succeeded = false;
+      final environments = m['environments'] as List?;
+      if (environments != null) {
+        succeeded = environments.any((env) {
+          if (env is! Map) return false;
+          final status = env['status']?.toString().toLowerCase();
+          return status == 'succeeded';
+        });
+      }
+
+      DateTime? createdOn;
+      final createdOnRaw = m['createdOn']?.toString();
+      if (createdOnRaw != null) {
+        createdOn = DateTime.tryParse(createdOnRaw);
+      }
+
+      return ReleaseSummary(
+        id: (m['id'] as num).toInt(),
+        name: m['name'] as String? ?? '',
+        createdOn: createdOn,
+        artifactVersion: artifactVersion,
+        succeeded: succeeded,
+      );
+    }).toList();
+  }
 }

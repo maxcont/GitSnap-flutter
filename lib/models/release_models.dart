@@ -56,3 +56,21 @@ class VariableDiffEntry {
     this.different = false,
   });
 }
+
+/// Summary of a single release (rilascio) returned by the Release API,
+/// used to check whether a given build was deployed to an environment.
+class ReleaseSummary {
+  final int id;
+  final String name;
+  final DateTime? createdOn;
+  final String artifactVersion;
+  final bool succeeded;
+
+  ReleaseSummary({
+    required this.id,
+    required this.name,
+    required this.createdOn,
+    required this.artifactVersion,
+    required this.succeeded,
+  });
+}
