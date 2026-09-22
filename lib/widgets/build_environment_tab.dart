@@ -196,23 +196,42 @@ class _BuildEnvironmentTabState extends State<BuildEnvironmentTab> {
 
   Widget _buildRow(_QueryRow row, List<Repository> repositories) {
     return Padding(
+      key: ValueKey(row),
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
           Expanded(
             flex: 3,
-            child: DropdownButtonFormField<Repository>(
-              decoration: const InputDecoration(labelText: 'Repository'),
-              value: row.repository,
-              isExpanded: true,
-              items: repositories
-                  .map((repo) => DropdownMenuItem(
-                        value: repo,
-                        child:
-                            Text(repo.name, overflow: TextOverflow.ellipsis),
-                      ))
-                  .toList(),
-              onChanged: (value) => setState(() => row.repository = value),
+            child: Autocomplete<Repository>(
+              displayStringForOption: (repo) => repo.name,
+              initialValue:
+                  TextEditingValue(text: row.repository?.name ?? ''),
+              optionsBuilder: (textEditingValue) {
+                final query = textEditingValue.text.trim().toLowerCase();
+                if (query.isEmpty) return repositories;
+                return repositories
+                    .where((repo) => repo.name.toLowerCase().contains(query));
+              },
+              onSelected: (repo) => setState(() => row.repository = repo),
+              fieldViewBuilder:
+                  (context, textController, focusNode, onFieldSubmitted) {
+                return TextField(
+                  controller: textController,
+                  focusNode: focusNode,
+                  decoration: const InputDecoration(
+                    labelText: 'Repository',
+                    hintText: 'Cerca repository…',
+                  ),
+                  onChanged: (text) {
+                    // Clear the selected repository if the user edits the
+                    // text away from a previously selected option, so a
+                    // stale repository can't be searched by mistake.
+                    if (row.repository != null && text != row.repository!.name) {
+                      setState(() => row.repository = null);
+                    }
+                  },
+                );
+              },
             ),
           ),
           const SizedBox(width: 12),
@@ -324,6 +343,10 @@ class _BuildEnvironmentTabState extends State<BuildEnvironmentTab> {
     required Widget icon,
     required String text,
   }) {
+    // Tile backgrounds are always light (green/amber/grey/red shade100-200),
+    // so text/icon colors are fixed to dark regardless of the app theme to
+    // guarantee readable contrast (see dark theme readability fix).
+    const textColor = Colors.black87;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -333,14 +356,22 @@ class _BuildEnvironmentTabState extends State<BuildEnvironmentTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(
+            label,
+            style: const TextStyle(
+                fontWeight: FontWeight.bold, color: textColor),
+          ),
           const SizedBox(height: 8),
           Row(
             children: [
               icon,
               const SizedBox(width: 8),
               Expanded(
-                  child: Text(text, style: const TextStyle(fontSize: 12))),
+                child: Text(
+                  text,
+                  style: const TextStyle(fontSize: 12, color: textColor),
+                ),
+              ),
             ],
           ),
         ],
