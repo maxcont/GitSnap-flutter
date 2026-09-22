@@ -373,7 +373,12 @@ class AzureDevOpsClient {
   static int totalChangesFromDiff(Map<String, dynamic> data) {
     final changes = data['changes'] as List?;
     if (changes != null && changes.isNotEmpty) {
-      return changes.length;
+      // Azure DevOps includes intermediate folder entries in the diff
+      // response (item.isFolder == true); exclude those from the count.
+      return changes.where((c) {
+        final item = c is Map ? c['item'] : null;
+        return !(item is Map && item['isFolder'] == true);
+      }).length;
     }
     final changeCounts = data['changeCounts'];
     if (changeCounts is Map) {
@@ -393,6 +398,9 @@ class AzureDevOpsClient {
     return changes
         .map((c) {
           final item = c is Map ? c['item'] : null;
+          // Azure DevOps includes intermediate folder entries in the diff
+          // response (item.isFolder == true); skip those, we only want files.
+          if (item is Map && item['isFolder'] == true) return null;
           final path =
               item is Map ? (item['path'] ?? item['originalPath']) : null;
           final p = path ?? (c is Map ? c['path'] : null);
