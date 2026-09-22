@@ -12,6 +12,7 @@ class ProjectConfig {
   final String? baseUrl;
   final String? username;
   final String? pat;
+  final String? castBaseUrl;
 
   ProjectConfig({
     required this.id,
@@ -21,6 +22,7 @@ class ProjectConfig {
     this.baseUrl,
     this.username,
     this.pat,
+    this.castBaseUrl,
   });
 
   factory ProjectConfig.fromJson(Map<String, dynamic> json) =>
@@ -35,6 +37,7 @@ class ProjectConfig {
     String? baseUrl,
     String? username,
     String? pat,
+    String? castBaseUrl,
   }) {
     return ProjectConfig(
       id: id ?? this.id,
@@ -44,6 +47,7 @@ class ProjectConfig {
       baseUrl: baseUrl ?? this.baseUrl,
       username: username ?? this.username,
       pat: pat ?? this.pat,
+      castBaseUrl: castBaseUrl ?? this.castBaseUrl,
     );
   }
 }

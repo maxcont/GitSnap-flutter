@@ -15,6 +15,7 @@ ProjectConfig _$ProjectConfigFromJson(Map<String, dynamic> json) =>
       baseUrl: json['baseUrl'] as String?,
       username: json['username'] as String?,
       pat: json['pat'] as String?,
+      castBaseUrl: json['castBaseUrl'] as String?,
     );
 
 Map<String, dynamic> _$ProjectConfigToJson(ProjectConfig instance) =>
@@ -26,6 +27,7 @@ Map<String, dynamic> _$ProjectConfigToJson(ProjectConfig instance) =>
       'baseUrl': instance.baseUrl,
       'username': instance.username,
       'pat': instance.pat,
+      'castBaseUrl': instance.castBaseUrl,
     };
 
 Repository _$RepositoryFromJson(Map<String, dynamic> json) => Repository(
@@ -74,10 +76,12 @@ DiffResult _$DiffResultFromJson(Map<String, dynamic> json) => DiffResult(
       repoId: json['repoId'] as String,
       repoName: json['repoName'] as String,
       status: $enumDecode(_$DiffStatusEnumMap, json['status']),
-      commitCount: json['commitCount'] as int? ?? 0,
-      sourceOnlyCommitCount: json['sourceOnlyCommitCount'] as int? ?? 0,
-      targetOnlyCommitCount: json['targetOnlyCommitCount'] as int? ?? 0,
-      fileCount: json['fileCount'] as int? ?? 0,
+      commitCount: (json['commitCount'] as num?)?.toInt() ?? 0,
+      sourceOnlyCommitCount:
+          (json['sourceOnlyCommitCount'] as num?)?.toInt() ?? 0,
+      targetOnlyCommitCount:
+          (json['targetOnlyCommitCount'] as num?)?.toInt() ?? 0,
+      fileCount: (json['fileCount'] as num?)?.toInt() ?? 0,
       sourceRef: json['sourceRef'] as String?,
       targetRef: json['targetRef'] as String?,
       sourceCommit: json['sourceCommit'] as String?,
@@ -129,29 +133,3 @@ const _$DiffStatusEnumMap = {
   DiffStatus.divergent: 'divergent',
   DiffStatus.error: 'error',
 };
-
-K $enumDecode<K, V>(
-  Map<K, V> enumValues,
-  Object? source, {
-  K? unknownValue,
-}) {
-  if (source == null) {
-    throw ArgumentError(
-      'A value must be provided. Supported values: '
-      '${enumValues.values.join(', ')}',
-    );
-  }
-
-  return enumValues.entries.singleWhere(
-    (e) => e.value == source,
-    orElse: () {
-      if (unknownValue == null) {
-        throw ArgumentError(
-          '`$source` is not one of the supported values: '
-          '${enumValues.values.join(', ')}',
-        );
-      }
-      return MapEntry(unknownValue, enumValues.values.first);
-    },
-  ).key;
-}

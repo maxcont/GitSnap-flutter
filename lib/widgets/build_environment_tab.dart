@@ -4,8 +4,11 @@ import 'package:provider/provider.dart';
 
 import '../models/azure_models.dart';
 import '../models/build_environment_result.dart';
+import '../models/cast_models.dart';
 import '../providers/app_state.dart';
 import '../services/build_search_service.dart';
+import '../services/cast_client.dart';
+import '../services/cast_session.dart';
 
 class BuildEnvironmentTab extends StatefulWidget {
   const BuildEnvironmentTab({super.key});
@@ -39,6 +42,10 @@ class _BuildEnvironmentTabState extends State<BuildEnvironmentTab> {
   DateTime? _toDate;
   List<_ComboSearch> _results = [];
   String? _error;
+  bool _castChecking = false;
+  final Map<String, CastBuildRating?> _castRatings = {};
+  final Map<String, String> _castErrors = {};
+  final Set<String> _castLoading = {};
 
   @override
   void dispose() {
@@ -104,12 +111,83 @@ class _BuildEnvironmentTabState extends State<BuildEnvironmentTab> {
           ? 'Compila almeno una riga con repository e numero build.'
           : null;
       _results = combos;
+      _castRatings.clear();
+      _castErrors.clear();
     });
+  }
+
+  String _castKey(_ComboSearch combo, String label) =>
+      '${combo.repository.id}|${combo.buildQuery}|$label';
+
+  Future<void> _verifyCast(AppState appState) async {
+    final castSession = context.read<CastSession>();
+    await castSession.initialize();
+    if (!castSession.ready) {
+      setState(() => _error = 'WebView CAST non ancora pronta.');
+      return;
+    }
+    if (appState.castBaseUrl.trim().isEmpty) {
+      setState(
+          () => _error = 'Configura il CAST Base URL prima della verifica.');
+      return;
+    }
+    setState(() {
+      _castChecking = true;
+      _error = null;
+      _castRatings.clear();
+      _castErrors.clear();
+    });
+    // Keep the panel minimized by default: when a Windows/NTLM session is
+    // already valid the CAST pages load silently with no visible login
+    // form, so there's nothing useful to show. The user can still expand
+    // the small badge manually if a check gets stuck (e.g. a real login
+    // prompt appears).
+    castSession.showPanel(minimized: true);
+    final client = CastClient(
+      controller: castSession.controller,
+      baseUrl: appState.castBaseUrl,
+    );
+    try {
+      for (final combo in _results) {
+        for (final label in BuildSearchService.environmentFolders.keys) {
+          final key = _castKey(combo, label);
+          final environment = await combo.environmentFutures[label]!;
+          if (environment.status != BuildEnvironmentStatus.found) continue;
+          setState(() => _castLoading.add(key));
+          try {
+            final rating = await client.findBuildRating(
+              combo.repository.name,
+              environment.release!.artifactVersion,
+            );
+            if (mounted) {
+              setState(() {
+                _castRatings[key] = rating;
+                _castLoading.remove(key);
+              });
+            }
+          } on CastClientError catch (error) {
+            if (mounted) {
+              setState(() {
+                _castErrors[key] = error.message;
+                _castLoading.remove(key);
+              });
+            }
+          }
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _castChecking = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+    return _buildMainContent(context, appState);
+  }
+
+  Widget _buildMainContent(BuildContext context, AppState appState) {
+    final castSession = context.watch<CastSession>();
     final dateFormat = DateFormat('dd/MM/yyyy');
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -174,6 +252,23 @@ class _BuildEnvironmentTabState extends State<BuildEnvironmentTab> {
                         icon: const Icon(Icons.search),
                         label: const Text('Cerca tutto'),
                       ),
+                      if (_results.isNotEmpty)
+                        FilledButton.icon(
+                          onPressed: _castChecking
+                              ? null
+                              : () => _verifyCast(appState),
+                          icon: const Icon(Icons.verified_outlined),
+                          label: Text(_castChecking
+                              ? 'CAST in corso…'
+                              : 'Verifica CAST'),
+                        ),
+                      if (!castSession.panelVisible &&
+                          (_castChecking || _castRatings.isNotEmpty))
+                        OutlinedButton.icon(
+                          onPressed: castSession.showPanel,
+                          icon: const Icon(Icons.open_in_new),
+                          label: const Text('Mostra login CAST'),
+                        ),
                     ],
                   ),
                 ],
@@ -204,8 +299,7 @@ class _BuildEnvironmentTabState extends State<BuildEnvironmentTab> {
             flex: 3,
             child: Autocomplete<Repository>(
               displayStringForOption: (repo) => repo.name,
-              initialValue:
-                  TextEditingValue(text: row.repository?.name ?? ''),
+              initialValue: TextEditingValue(text: row.repository?.name ?? ''),
               optionsBuilder: (textEditingValue) {
                 final query = textEditingValue.text.trim().toLowerCase();
                 if (query.isEmpty) return repositories;
@@ -226,7 +320,8 @@ class _BuildEnvironmentTabState extends State<BuildEnvironmentTab> {
                     // Clear the selected repository if the user edits the
                     // text away from a previously selected option, so a
                     // stale repository can't be searched by mistake.
-                    if (row.repository != null && text != row.repository!.name) {
+                    if (row.repository != null &&
+                        text != row.repository!.name) {
                       setState(() => row.repository = null);
                     }
                   },
@@ -268,9 +363,11 @@ class _BuildEnvironmentTabState extends State<BuildEnvironmentTab> {
             Wrap(
               spacing: 12,
               runSpacing: 12,
-              children: BuildSearchService.environmentFolders.keys
-                  .map((label) => _environmentTile(label, combo))
-                  .toList(),
+              children: [
+                ...BuildSearchService.environmentFolders.keys
+                    .map((label) => _environmentTile(label, combo)),
+                _castCard(combo),
+              ],
             ),
           ],
         ),
@@ -358,8 +455,8 @@ class _BuildEnvironmentTabState extends State<BuildEnvironmentTab> {
         children: [
           Text(
             label,
-            style: const TextStyle(
-                fontWeight: FontWeight.bold, color: textColor),
+            style:
+                const TextStyle(fontWeight: FontWeight.bold, color: textColor),
           ),
           const SizedBox(height: 8),
           Row(
@@ -375,6 +472,84 @@ class _BuildEnvironmentTabState extends State<BuildEnvironmentTab> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  /// Separate "CAST" tile shown alongside the four environment tiles: it
+  /// lists, per environment where a matching build was actually found, the
+  /// CAST Quality Rating of that build (A/B/C/D/F), instead of being nested
+  /// inside the environment tile itself.
+  Widget _castCard(_ComboSearch combo) {
+    const textColor = Colors.black87;
+    final lines = <Widget>[];
+    for (final label in BuildSearchService.environmentFolders.keys) {
+      final key = _castKey(combo, label);
+      if (_castLoading.contains(key)) {
+        lines.add(const Text('Verifica in corso…',
+            style: TextStyle(fontSize: 12, color: textColor)));
+      } else if (_castErrors.containsKey(key)) {
+        lines.add(Text('Errore · ${_castErrors[key]}',
+            style: const TextStyle(fontSize: 12, color: Colors.red)));
+      } else if (_castRatings.containsKey(key)) {
+        final rating = _castRatings[key];
+        if (rating == null) {
+          lines.add(const Text('Build non trovata su CAST',
+              style: TextStyle(fontSize: 12, color: textColor)));
+        } else {
+          final normalized = rating.rating.toUpperCase();
+          final color =
+              normalized == 'A' ? Colors.green.shade800 : Colors.deepOrange;
+          lines.add(Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Text(
+              '$label: $normalized',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ));
+        }
+      }
+    }
+
+    final body = lines.isEmpty
+        ? Text(
+            _castChecking
+                ? 'Verifica in corso…'
+                : 'Premi "Verifica CAST" per il rating qualità.',
+            style: const TextStyle(fontSize: 12, color: textColor),
+          )
+        : Column(crossAxisAlignment: CrossAxisAlignment.start, children: lines);
+
+    return SizedBox(
+      width: 220,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.blueGrey.shade50,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.verified_outlined, color: textColor, size: 18),
+                SizedBox(width: 8),
+                Text(
+                  'CAST',
+                  style:
+                      TextStyle(fontWeight: FontWeight.bold, color: textColor),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            body,
+          ],
+        ),
       ),
     );
   }

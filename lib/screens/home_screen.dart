@@ -9,14 +9,49 @@ import '../widgets/projects_sidebar.dart';
 import '../widgets/pipeline_variables_tab.dart';
 import '../widgets/pull_requests_tab.dart';
 import '../widgets/build_environment_tab.dart';
+import '../widgets/cast_login_panel.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  // The CAST login badge/panel is only relevant on the tabs that actually
+  // interact with CAST: "Confronto repository" (index 0, hosts the
+  // "Rilogga CAST" button) and "Verifica build" (index 3, hosts "Verifica
+  // CAST"). Showing it while browsing the other, unrelated tabs would just
+  // be visual clutter.
+  static const _tabsWithCastPanel = {0, 3};
+
+  int _currentTabIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.index != _currentTabIndex) {
+        setState(() => _currentTabIndex = _tabController.index);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 4,
+    return CastLoginOverlay(
+      showPanel: _tabsWithCastPanel.contains(_currentTabIndex),
       child: Scaffold(
         appBar: AppBar(
           title: FittedBox(
@@ -38,8 +73,9 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
           ),
-          bottom: const TabBar(
-            tabs: [
+          bottom: TabBar(
+            controller: _tabController,
+            tabs: const [
               Tab(
                   text: 'Confronto repository',
                   icon: Icon(Icons.compare_arrows)),
@@ -78,6 +114,7 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
         body: TabBarView(
+          controller: _tabController,
           children: [
             _ComparisonTab(),
             const PipelineVariablesTab(),

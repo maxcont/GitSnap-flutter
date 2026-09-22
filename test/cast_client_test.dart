@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gitsnap_flutter/models/cast_models.dart';
 import 'package:gitsnap_flutter/services/cast_client.dart';
@@ -72,8 +74,40 @@ void main() {
     });
 
     test('returns an empty list when there is no history table', () {
-      final rows = CastClient.parseHistoryTable('<html><body>Not found</body></html>');
+      final rows =
+          CastClient.parseHistoryTable('<html><body>Not found</body></html>');
       expect(rows, isEmpty);
+    });
+
+    test('extracts build/rating even when their cells wrap text in nested tags',
+        () {
+      const html = '''
+<table>
+  <tbody>
+    <tr>
+      <td class="text-center"><span>2.0.26264.01</span></td>
+      <td>bug_fix/bugfix_09_2026</td>
+      <td class="text-center"><a href="/cast/scans/2026/9/21">21/09/2026</a></td>
+      <td class="text-center"><strong>A</strong></td>
+      <td class="text-center">--:--:--</td>
+    </tr>
+  </tbody>
+</table>
+''';
+      final rows = CastClient.parseHistoryTable(html);
+      expect(rows, hasLength(1));
+      expect(rows[0].build, '2.0.26264.01');
+      expect(rows[0].rating, 'A');
+    });
+
+    test('parses a real CAST component page fixture and finds the build', () {
+      final html = File('test/fixtures/cast_sample_page.html').readAsStringSync();
+      final rows = CastClient.parseHistoryTable(html);
+
+      expect(rows, isNotEmpty);
+      final match = CastClient.findExactBuild(rows, '2.0.26264.01');
+      expect(match, isNotNull);
+      expect(match!.rating, 'A');
     });
   });
 

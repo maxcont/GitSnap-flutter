@@ -19,6 +19,7 @@ class _ProjectsSidebarState extends State<ProjectsSidebar> {
   final _projectController = TextEditingController();
   final _usernameController = TextEditingController();
   final _patController = TextEditingController();
+  final _castBaseUrlController = TextEditingController();
   bool _showAddForm = false;
   String? _editingProjectId;
 
@@ -30,6 +31,7 @@ class _ProjectsSidebarState extends State<ProjectsSidebar> {
     _projectController.dispose();
     _usernameController.dispose();
     _patController.dispose();
+    _castBaseUrlController.dispose();
     super.dispose();
   }
 
@@ -40,6 +42,7 @@ class _ProjectsSidebarState extends State<ProjectsSidebar> {
     _projectController.clear();
     _usernameController.clear();
     _patController.clear();
+    _castBaseUrlController.clear();
   }
 
   void _fillFormFromProject(ProjectConfig project) {
@@ -49,6 +52,7 @@ class _ProjectsSidebarState extends State<ProjectsSidebar> {
     _projectController.text = project.project;
     _usernameController.text = project.username ?? '';
     _patController.text = project.pat ?? '';
+    _castBaseUrlController.text = project.castBaseUrl ?? '';
   }
 
   void _saveProject(AppState appState) {
@@ -61,13 +65,15 @@ class _ProjectsSidebarState extends State<ProjectsSidebar> {
             : '${_orgController.text}/${_projectController.text}',
         organization: _orgController.text,
         project: _projectController.text,
-        baseUrl: _baseUrlController.text.isNotEmpty
-            ? _baseUrlController.text
-            : null,
+        baseUrl:
+            _baseUrlController.text.isNotEmpty ? _baseUrlController.text : null,
         username: _usernameController.text.isNotEmpty
             ? _usernameController.text
             : null,
         pat: _patController.text.isNotEmpty ? _patController.text : null,
+        castBaseUrl: _castBaseUrlController.text.isNotEmpty
+            ? _castBaseUrlController.text
+            : null,
       );
 
       if (isEditing) {
@@ -255,8 +261,10 @@ class _ProjectsSidebarState extends State<ProjectsSidebar> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color:
-                          Theme.of(context).colorScheme.surface.withOpacity(0.5),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surface
+                          .withOpacity(0.5),
                     ),
                     child: Form(
                       key: _formKey,
@@ -336,10 +344,20 @@ class _ProjectsSidebarState extends State<ProjectsSidebar> {
                           TextFormField(
                             controller: _patController,
                             decoration: const InputDecoration(
-                              labelText: 'PAT (opzionale, salvato con il progetto)',
+                              labelText:
+                                  'PAT (opzionale, salvato con il progetto)',
                               border: OutlineInputBorder(),
                             ),
                             obscureText: true,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _castBaseUrlController,
+                            decoration: const InputDecoration(
+                              labelText: 'CAST Base URL (opzionale)',
+                              hintText: 'es. https://server:9091',
+                              border: OutlineInputBorder(),
+                            ),
                           ),
                           const SizedBox(height: 16),
                           Row(

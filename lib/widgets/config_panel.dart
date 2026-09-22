@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
+import '../services/cast_session.dart';
 
 class ConfigPanel extends StatefulWidget {
   const ConfigPanel({super.key});
@@ -15,6 +16,7 @@ class _ConfigPanelState extends State<ConfigPanel> {
   late TextEditingController _projectController;
   late TextEditingController _usernameController;
   late TextEditingController _patController;
+  late TextEditingController _castBaseUrlController;
   String? _lastSyncedProjectId;
 
   void _syncFromAppState(AppState appState) {
@@ -25,6 +27,7 @@ class _ConfigPanelState extends State<ConfigPanel> {
     _projectController.text = appState.project;
     _usernameController.text = appState.username;
     _patController.text = appState.pat;
+    _castBaseUrlController.text = appState.castBaseUrl;
   }
 
   @override
@@ -36,6 +39,7 @@ class _ConfigPanelState extends State<ConfigPanel> {
     _projectController = TextEditingController(text: appState.project);
     _usernameController = TextEditingController(text: appState.username);
     _patController = TextEditingController(text: appState.pat);
+    _castBaseUrlController = TextEditingController(text: appState.castBaseUrl);
     _lastSyncedProjectId = appState.currentProjectId;
   }
 
@@ -46,6 +50,7 @@ class _ConfigPanelState extends State<ConfigPanel> {
     _projectController.dispose();
     _usernameController.dispose();
     _patController.dispose();
+    _castBaseUrlController.dispose();
     super.dispose();
   }
 
@@ -140,6 +145,47 @@ class _ConfigPanelState extends State<ConfigPanel> {
               onChanged: (value) {
                 context.read<AppState>().setPat(value);
               },
+            ),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _castBaseUrlController,
+                    decoration: const InputDecoration(
+                      labelText: 'CAST Base URL (opzionale)',
+                      hintText: 'es. https://server:9091',
+                      helperText:
+                          'Usato per verificare il Quality Rating delle build.',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (value) {
+                      context.read<AppState>().setCastBaseUrl(value);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      final castBaseUrl = context.read<AppState>().castBaseUrl;
+                      if (castBaseUrl.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Compila prima il CAST Base URL.'),
+                          ),
+                        );
+                        return;
+                      }
+                      context.read<CastSession>().openLoginPage(castBaseUrl);
+                    },
+                    icon: const Icon(Icons.login),
+                    label: const Text('Rilogga CAST'),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             ElevatedButton.icon(

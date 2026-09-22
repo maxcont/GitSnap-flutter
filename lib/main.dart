@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/app_state.dart';
 import 'screens/home_screen.dart';
+import 'services/cast_session.dart';
 
 void main() {
   runApp(const GitSnapApp());
@@ -19,8 +20,11 @@ class GitSnapApp extends StatelessWidget {
       ),
     );
 
-    return ChangeNotifierProvider(
-      create: (_) => AppState(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppState()),
+        ChangeNotifierProvider(create: (_) => CastSession()),
+      ],
       child: MaterialApp(
         title: 'GitSnap - Confronto Ambienti',
         debugShowCheckedModeBanner: false,

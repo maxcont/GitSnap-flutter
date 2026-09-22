@@ -17,6 +17,7 @@ class AppState extends ChangeNotifier {
   String _project = '';
   String _username = '';
   String _pat = '';
+  String _castBaseUrl = '';
 
   // Client
   AzureDevOpsClient? _client;
@@ -55,6 +56,7 @@ class AppState extends ChangeNotifier {
   String get project => _project;
   String get username => _username;
   String get pat => _pat;
+  String get castBaseUrl => _castBaseUrl;
   AzureDevOpsClient? get client => _client;
   List<Repository> get repositories => _repositories;
   Set<String> get selectedRepoIds => _selectedRepoIds;
@@ -105,6 +107,7 @@ class AppState extends ChangeNotifier {
       _organization = config['organization'] ?? '';
       _project = config['project'] ?? '';
       _username = config['username'] ?? '';
+      _castBaseUrl = config['cast_base_url'] ?? '';
 
       if (config['selected_repo_ids'] != null) {
         _selectedRepoIds = Set<String>.from(config['selected_repo_ids']);
@@ -145,6 +148,11 @@ class AppState extends ChangeNotifier {
 
   void setPat(String value) {
     _pat = value;
+    notifyListeners();
+  }
+
+  void setCastBaseUrl(String value) {
+    _castBaseUrl = value;
     notifyListeners();
   }
 
@@ -511,6 +519,7 @@ class AppState extends ChangeNotifier {
       'organization': _organization,
       'project': _project,
       'username': _username,
+      'cast_base_url': _castBaseUrl,
       'selected_repo_ids': _selectedRepoIds.toList(),
       'source': _sourceRef.toJson(),
       'target': _targetRef.toJson(),
@@ -548,6 +557,7 @@ class AppState extends ChangeNotifier {
     _project = project.project;
     _username = project.username ?? '';
     _pat = project.pat ?? '';
+    _castBaseUrl = project.castBaseUrl ?? '';
     _currentProjectId = project.id;
     _repositories = [];
     _selectedRepoIds.clear();
