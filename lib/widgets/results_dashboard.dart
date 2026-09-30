@@ -181,7 +181,7 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                           ),
                                         if (result.sourceCommit != null)
                                           Text(
-                                            'Commit: ${result.sourceCommit!.substring(0, 7)}${result.sourceCommitDate == null ? '' : ' · ${_formatDate(result.sourceCommitDate)}'}',
+                                            'Commit: ${result.sourceCommit!.substring(0, 7)}',
                                             style: const TextStyle(
                                               fontFamily: 'monospace',
                                               fontSize: 12,
@@ -194,6 +194,11 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                               fontStyle: FontStyle.italic,
                                               fontSize: 12,
                                             ),
+                                          ),
+                                        if (result.sourceCommitDate != null)
+                                          Text(
+                                            'Data: ${_formatDate(result.sourceCommitDate)}',
+                                            style: const TextStyle(fontSize: 12),
                                           ),
                                         const SizedBox(height: 8),
                                         Text(
@@ -234,7 +239,7 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                           ),
                                         if (result.targetCommit != null)
                                           Text(
-                                            'Commit: ${result.targetCommit!.substring(0, 7)}${result.targetCommitDate == null ? '' : ' · ${_formatDate(result.targetCommitDate)}'}',
+                                            'Commit: ${result.targetCommit!.substring(0, 7)}',
                                             style: const TextStyle(
                                               fontFamily: 'monospace',
                                               fontSize: 12,
@@ -247,6 +252,11 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                               fontStyle: FontStyle.italic,
                                               fontSize: 12,
                                             ),
+                                          ),
+                                        if (result.targetCommitDate != null)
+                                          Text(
+                                            'Data: ${_formatDate(result.targetCommitDate)}',
+                                            style: const TextStyle(fontSize: 12),
                                           ),
                                         const SizedBox(height: 8),
                                         Text(
