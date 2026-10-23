@@ -49,7 +49,21 @@ flutter run -d linux    # Per Linux
 ```bash
 flutter build windows --release
 ```
-L'eseguibile si troverà in: `build/windows/runner/Release/gitsnap_flutter.exe`
+L'eseguibile si troverà in: `build/windows/x64/runner/Release/gitsnap_flutter.exe`
+
+### Distribuzione e aggiornamenti Windows
+
+La distribuzione al team supporta un installer per utente e aggiornamenti tramite
+GitHub Releases, con conferma prima dell'installazione. La pipeline genera una
+release in bozza quando viene pubblicato un tag `vMAJOR.MINOR.PATCH`.
+
+La versione viene definita esclusivamente in `pubspec.yaml` come
+`MAJOR.MINOR.PATCH+BUILD`. Le build normali e di sviluppo non attivano l'updater:
+serve il packaging firmato descritto nella
+[guida agli aggiornamenti Windows](BUILD_INSTRUCTIONS.md#aggiornamenti-windows-con-github-releases).
+
+Non occorrono token GitHub nei PC del team. I pacchetti pubblicati sono pubblici;
+non includere credenziali o configurazioni aziendali nella distribuzione.
 
 #### macOS
 ```bash
@@ -133,7 +147,7 @@ lib/
 ## Dati Salvati
 
 I dati vengono salvati in:
-- **Windows**: `%APPDATA%/GitSnap/data/`
+- **Windows**: cartella Documenti dell'utente, sotto `GitSnap\data`
 - **macOS**: `~/Library/Application Support/GitSnap/data/`
 - **Linux**: `~/.local/share/GitSnap/data/`
 
