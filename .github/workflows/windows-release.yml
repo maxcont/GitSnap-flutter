@@ -1,0 +1,107 @@
+name: Windows release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.38.9'
+          channel: stable
+          cache: true
+
+      - name: Validate version and signing configuration
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          UPDATER_PUBLIC_KEY: ${{ vars.UPDATER_PUBLIC_KEY }}
+          UPDATER_PRIVATE_KEY: ${{ secrets.UPDATER_PRIVATE_KEY }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . .\scripts\release_helpers.ps1
+          Get-GitSnapRelease -PubspecPath .\pubspec.yaml -Tag $env:RELEASE_TAG | Format-List
+          if (-not $env:UPDATER_PUBLIC_KEY -or -not $env:UPDATER_PRIVATE_KEY) {
+            throw 'Configure UPDATER_PUBLIC_KEY (variable) and UPDATER_PRIVATE_KEY (secret) before releasing.'
+          }
+          $env:UPDATER_PUBLIC_KEY | Set-Content .\windows\runner\resources\updater_public_key.pem -Encoding ascii
+          $env:UPDATER_PRIVATE_KEY | Set-Content (Join-Path $env:RUNNER_TEMP 'gitsnap-private.pem') -Encoding ascii
+
+      - name: Restore dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Test
+        shell: pwsh
+        run: |
+          flutter test
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter tests failed.' }
+          & .\test\release_scripts_test.ps1
+          & .\test\update_signing_test.ps1
+
+      - name: Ensure installer compiler is available
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") -and
+              -not (Test-Path "$env:ProgramFiles\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress --yes
+            if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
+          }
+
+      - name: Build and sign installer
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          & .\scripts\build_windows_release.ps1 `
+            -PrivateKeyPath (Join-Path $env:RUNNER_TEMP 'gitsnap-private.pem') `
+            -Repository $env:RELEASE_REPOSITORY -Tag $env:RELEASE_TAG
+
+      - name: Upload packages for verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          if-no-files-found: error
+          path: |
+            build\release\*-setup.exe
+            build\release\appcast.xml
+            build\release\SHA256SUMS.txt
+
+      - name: Create draft GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . .\scripts\release_helpers.ps1
+          $release = Get-GitSnapRelease -PubspecPath .\pubspec.yaml -Tag $env:RELEASE_TAG
+          $installer = Join-Path .\build\release $release.InstallerName
+          gh release create $env:RELEASE_TAG $installer .\build\release\appcast.xml .\build\release\SHA256SUMS.txt `
+            --repo $env:RELEASE_REPOSITORY --verify-tag --draft --generate-notes --title "GitSnap $($release.Version)"
+          if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
+
+      - name: Remove signing material
+        if: always()
+        shell: pwsh
+        run: |
+          Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP 'gitsnap-private.pem') -Force -ErrorAction SilentlyContinue
+          Remove-Item -LiteralPath .\windows\runner\resources\updater_public_key.pem -Force -ErrorAction SilentlyContinue

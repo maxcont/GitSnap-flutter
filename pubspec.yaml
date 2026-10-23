@@ -1,7 +1,7 @@
 name: gitsnap_flutter
 description: GitSnap - Confronto ambienti Git tramite Azure DevOps
 publish_to: 'none'
-version: 1.0.0+1
+version: 0.1.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  auto_updater: ^1.0.0
   
   # State management
   provider: ^6.1.1

@@ -71,3 +71,10 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Updater signing material and generated release packages
+dsa_priv.pem
+dsaparam.pem
+*.private.pem
+/windows/runner/resources/updater_public_key.pem
+/assets/release/output/

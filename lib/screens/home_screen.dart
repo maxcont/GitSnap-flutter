@@ -10,6 +10,7 @@ import '../widgets/pipeline_variables_tab.dart';
 import '../widgets/pull_requests_tab.dart';
 import '../widgets/build_environment_tab.dart';
 import '../widgets/cast_login_panel.dart';
+import '../widgets/update_button.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -92,6 +93,7 @@ class _HomeScreenState extends State<HomeScreen>
             ],
           ),
           actions: [
+            const UpdateButton(),
             IconButton(
               icon: const Icon(Icons.folder),
               tooltip: 'Progetti',

@@ -27,6 +27,14 @@ target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_MINOR=${FLUTT
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_PATCH=${FLUTTER_VERSION_PATCH}")
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_BUILD=${FLUTTER_VERSION_BUILD}")
 
+file(GLOB GITSNAP_UPDATER_KEYS CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/resources/updater_public_key.pem")
+if(GITSNAP_UPDATER_KEYS)
+  target_compile_definitions(${BINARY_NAME} PRIVATE GITSNAP_SIGNED_UPDATES)
+  set_property(SOURCE "Runner.rc" APPEND PROPERTY
+    OBJECT_DEPENDS "${GITSNAP_UPDATER_KEYS}")
+endif()
+
 # Disable Windows macros that collide with C++ standard library functions.
 target_compile_definitions(${BINARY_NAME} PRIVATE "NOMINMAX")
 
