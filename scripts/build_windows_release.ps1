@@ -39,13 +39,13 @@ if (-not $IsccPath) {
         )) {
             if (Test-Path -LiteralPath $candidate) { $IsccPath = $candidate; break }
         }
-        if (-not $RuntimeDirectory) {
-            $RuntimeDirectory = Get-GitSnapRuntimeDirectory
-        }
-        $RuntimeDirectory = (Resolve-Path -LiteralPath $RuntimeDirectory).Path
     }
     if (-not $IsccPath) { throw 'Inno Setup 6.3 or newer is required (ISCC.exe).' }
 }
+if (-not $RuntimeDirectory) {
+    $RuntimeDirectory = Get-GitSnapRuntimeDirectory
+}
+$RuntimeDirectory = (Resolve-Path -LiteralPath $RuntimeDirectory).Path
 $signingDir = Join-Path $env:TEMP "gitsnap-signing-$PID"
 if (Test-Path -LiteralPath $signingDir) { throw "Signing directory already exists: $signingDir" }
 New-Item -ItemType Directory -Path $signingDir | Out-Null
