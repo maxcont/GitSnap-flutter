@@ -15,6 +15,28 @@ $tempDir = Join-Path $env:TEMP "gitsnap-release-test-$PID"
 if (Test-Path $tempDir) { throw "Test directory already exists: $tempDir" }
 New-Item -ItemType Directory -Path $tempDir | Out-Null
 try {
+    $buildScript = Join-Path $PSScriptRoot '..\scripts\build_windows_release.ps1'
+    $tokens = $null
+    $parseErrors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile(
+        $buildScript, [ref]$tokens, [ref]$parseErrors)
+    Assert-True ($parseErrors.Count -eq 0) 'Release script has syntax errors'
+    $runtimeLookup = $ast.Find({
+        param($node)
+        $node -is [System.Management.Automation.Language.CommandAst] -and
+            $node.GetCommandName() -eq 'Get-GitSnapRuntimeDirectory'
+    }, $true)
+    Assert-True ($null -ne $runtimeLookup) 'Missing runtime discovery'
+    $parent = $runtimeLookup.Parent
+    while ($null -ne $parent) {
+        if ($parent -is [System.Management.Automation.Language.IfStatementAst]) {
+            foreach ($clause in $parent.Clauses) {
+                Assert-True ($clause.Item1.Extent.Text -notmatch '\$IsccPath|\bISCC\b') `
+                    'Runtime discovery must run independently of Inno Setup discovery (including when ISCC is already on PATH).'
+            }
+        }
+        $parent = $parent.Parent
+    }
     $pubspec = Join-Path $tempDir 'pubspec.yaml'
     Set-Content $pubspec 'version: 1.2.3+4'
     $release = Get-GitSnapRelease -PubspecPath $pubspec -Tag 'v1.2.3'
