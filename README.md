@@ -58,7 +58,11 @@ GitHub Releases, con conferma prima dell'installazione. La pipeline genera una
 release in bozza quando viene pubblicato un tag `vMAJOR.MINOR.PATCH`.
 
 La versione viene definita esclusivamente in `pubspec.yaml` come
-`MAJOR.MINOR.PATCH+BUILD`. Le build normali e di sviluppo non attivano l'updater:
+`MAJOR.MINOR.PATCH+BUILD` ed e' mostrata nel footer delle build distribuite.
+Il footer mostra nome e versione senza build a sinistra e autore a destra,
+su due righe negli spazi stretti. Il tooltip degli aggiornamenti conserva la
+versione completa. Le build locali senza `GITSNAP_VERSION` mostrano `sviluppo`.
+Le build normali e di sviluppo non attivano l'updater:
 serve il packaging firmato descritto nella
 [guida agli aggiornamenti Windows](BUILD_INSTRUCTIONS.md#aggiornamenti-windows-con-github-releases).
 

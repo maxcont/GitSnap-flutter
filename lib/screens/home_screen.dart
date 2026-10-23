@@ -11,6 +11,7 @@ import '../widgets/pull_requests_tab.dart';
 import '../widgets/build_environment_tab.dart';
 import '../widgets/cast_login_panel.dart';
 import '../widgets/update_button.dart';
+import '../widgets/app_footer.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -68,16 +69,6 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
                 const SizedBox(width: 12),
                 const Text('GitSnap – Confronto Ambienti'),
-                const SizedBox(width: 16),
-                Text(
-                  '·  M.Contursi',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withOpacity(0.6),
-                      ),
-                ),
               ],
             ),
           ),
@@ -208,17 +199,7 @@ class _ComparisonTab extends StatelessWidget {
                   ),
                 ),
               const SizedBox(height: 32),
-              Center(
-                child: Text(
-                  'GitSnap · by M.Contursi',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withOpacity(0.4),
-                      ),
-                ),
-              ),
+              const AppFooter(),
             ],
           ),
         );
