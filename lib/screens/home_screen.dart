@@ -59,7 +59,14 @@ class _HomeScreenState extends State<HomeScreen>
             alignment: Alignment.centerLeft,
             child: Row(
               children: [
-                const Text('🔄 GitSnap – Confronto Ambienti'),
+                Image.asset(
+                  'assets/ico/ico_white.png',
+                  width: 40,
+                  height: 40,
+                  semanticLabel: 'GitSnap',
+                ),
+                const SizedBox(width: 12),
+                const Text('GitSnap – Confronto Ambienti'),
                 const SizedBox(width: 16),
                 Text(
                   '·  M.Contursi',

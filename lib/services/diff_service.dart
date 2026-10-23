@@ -98,6 +98,37 @@ class DiffService {
         );
       }
 
+      final commitDetails = await Future.wait([
+        client.getCommit(repo.id, sourceCommitId),
+        client.getCommit(repo.id, targetCommitId),
+      ]);
+      final sourceCommit = commitDetails[0];
+      final targetCommit = commitDetails[1];
+
+      // Same tree = identical content, even if history differs (e.g. squash merge).
+      final sourceTreeId = sourceCommit['treeId'];
+      final targetTreeId = targetCommit['treeId'];
+      if (sourceTreeId is String &&
+          sourceTreeId.isNotEmpty &&
+          sourceTreeId == targetTreeId) {
+        return DiffResult(
+          repoId: repo.id,
+          repoName: repo.name,
+          status: DiffStatus.aligned,
+          sourceRef: sourceRef.refName,
+          targetRef: targetRef.refName,
+          sourceCommit: sourceCommitId,
+          targetCommit: targetCommitId,
+          sourceCommitMessage: sourceCommit['comment'],
+          targetCommitMessage: targetCommit['comment'],
+          sourceCommitAuthor: sourceCommit['author']?['name'],
+          targetCommitAuthor: targetCommit['author']?['name'],
+          sourceCommitDate: sourceCommit['author']?['date'],
+          targetCommitDate: targetCommit['author']?['date'],
+          note: 'Contenuto identico (commit diversi, probabile squash merge)',
+        );
+      }
+
       // base=TARGET, target=SOURCE → aheadCount: SOURCE not in TARGET, behindCount: TARGET not in SOURCE
       final diffSourceNotInTarget = await client.getDiffsCommits(
         repo.id,
@@ -157,9 +188,6 @@ class DiffService {
       } catch (_) {
         // optional details: ignore
       }
-
-      final sourceCommit = await client.getCommit(repo.id, sourceCommitId);
-      final targetCommit = await client.getCommit(repo.id, targetCommitId);
 
       final totalCommitDiff = sourceAheadCount + targetAheadCount;
       return DiffResult(
