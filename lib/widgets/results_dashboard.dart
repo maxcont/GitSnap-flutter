@@ -351,7 +351,9 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                               // Link Apri Compare in Azure DevOps (come in Streamlit)
                               if (result.repoId.isNotEmpty &&
                                   appState.organization.isNotEmpty &&
-                                  appState.project.isNotEmpty) ...[
+                                  appState.project.isNotEmpty &&
+                                  result.sourceCommit != null &&
+                                  result.targetCommit != null) ...[
                                 const Divider(height: 24),
                                 _CompareLink(
                                   baseUrl: appState.baseUrl,
@@ -360,6 +362,8 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                   repoName: result.repoName,
                                   sourceRef: result.sourceRef,
                                   targetRef: result.targetRef,
+                                  sourceCommit: result.sourceCommit!,
+                                  targetCommit: result.targetCommit!,
                                 ),
                               ],
                             ],
@@ -662,6 +666,8 @@ class _CompareLink extends StatelessWidget {
   final String repoName;
   final String? sourceRef;
   final String? targetRef;
+  final String sourceCommit;
+  final String targetCommit;
 
   const _CompareLink({
     required this.baseUrl,
@@ -670,15 +676,30 @@ class _CompareLink extends StatelessWidget {
     required this.repoName,
     this.sourceRef,
     this.targetRef,
+    required this.sourceCommit,
+    required this.targetCommit,
   });
 
   String get _compareUrl {
     final webBase = baseUrl.trim().isEmpty
         ? 'https://dev.azure.com'
         : baseUrl.trim().replaceAll(RegExp(r'/$'), '');
-    final tRef = Uri.encodeComponent(targetRef ?? '');
-    final sRef = Uri.encodeComponent(sourceRef ?? '');
-    return '$webBase/$organization/$project/_git/${Uri.encodeComponent(repoName)}/branchCompare?baseVersion=$tRef&targetVersion=$sRef&_a=commits';
+    String version(String? ref, String commit) {
+      if (ref != null && ref.startsWith('refs/heads/')) {
+        return 'GB${ref.substring('refs/heads/'.length)}';
+      }
+      // Tags resolve to short names; use their resolved commit, not a branch guess.
+      return 'GC$commit';
+    }
+
+    return Uri.parse(
+      '$webBase/${Uri.encodeComponent(organization)}/${Uri.encodeComponent(project)}'
+      '/_git/${Uri.encodeComponent(repoName)}/branchCompare',
+    ).replace(queryParameters: {
+      'baseVersion': version(targetRef, targetCommit),
+      'targetVersion': version(sourceRef, sourceCommit),
+      '_a': 'commits',
+    }).toString();
   }
 
   Future<void> _openCompare(BuildContext context) async {

@@ -12,6 +12,11 @@ Versione Flutter dell'applicazione GitSnap per il confronto di ambienti SOURCE v
 - 🌓 **Tema chiaro/scuro**: Adattamento automatico al tema di sistema
 - 🔀 **Panoramica Pull Request**: Dashboard multi-repository con filtri, dettagli e link Azure DevOps
 
+Il link **Apri Compare in Azure DevOps** supporta sia Azure DevOps Services
+sia Server on-premises. Mantiene TARGET come base e SOURCE come versione da
+confrontare: usa i branch per i riferimenti branch e i commit risolti per tag
+e SHA. Il link viene mostrato solo quando entrambi i commit sono risolti.
+
 ## Prerequisiti
 
 - Flutter SDK >= 3.0.0
