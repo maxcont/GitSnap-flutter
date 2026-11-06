@@ -153,6 +153,20 @@ lib/
 - Usa l'icona di collegamento per aprire la PR in Azure DevOps
 - Il PAT deve avere permessi di lettura su **Code**
 
+### 8. Ricerca commit
+- Nel tab **Pull request**, apri **Ricerca commit** e scegli testo, branch,
+  intervallo di date ed eventuali repository.
+- I risultati mostrano la data dell'autore e i nomi dei branch: usa il pulsante
+  con il conteggio per espandere quelli che non entrano nella riga. Il dettaglio
+  raggruppa i branch trovati tra quelli analizzati in principali, feature,
+  bugfix e altri; filtri, errori e il limite di 2.000 commit per branch possono
+  rendere il risultato parziale.
+- Il branch di origine non viene dedotto dalla sola presenza del commit.
+  Nel dettaglio, **Ricostruisci percorso** cerca su richiesta le pull request
+  associate al commit e mostra il branch sorgente della prima PR trovata quando
+  è univoco. Questo non prova il branch di origine; il percorso può essere
+  incompleto, ad esempio dopo push diretti, squash, rebase o cherry-pick.
+
 ## Dati Salvati
 
 I dati vengono salvati in:

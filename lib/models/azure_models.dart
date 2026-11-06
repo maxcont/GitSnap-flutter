@@ -87,7 +87,11 @@ class Commit {
     this.date,
   });
 
-  factory Commit.fromJson(Map<String, dynamic> json) => _$CommitFromJson(json);
+  factory Commit.fromJson(Map<String, dynamic> json) => _$CommitFromJson({
+        ...json,
+        'date':
+            (json['author'] as Map<String, dynamic>?)?['date'] ?? json['date'],
+      });
   Map<String, dynamic> toJson() => _$CommitToJson(this);
 }
 

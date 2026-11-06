@@ -8,6 +8,7 @@ import '../models/commit_search_models.dart';
 import '../models/pull_request_models.dart';
 import '../providers/app_state.dart';
 import '../services/pull_request_filter_service.dart';
+import 'commit_search_tile.dart';
 
 class PullRequestsTab extends StatefulWidget {
   const PullRequestsTab({super.key});
@@ -1123,22 +1124,18 @@ class _CommitSearchViewState extends State<_CommitSearchView> {
                 ),
                 children: entry.value
                     .map(
-                      (item) => ListTile(
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 16),
-                        title: Text(
-                          '${item.commitId.substring(0, item.commitId.length > 8 ? 8 : item.commitId.length)} · ${item.message}',
-                        ),
-                        subtitle: Text(
-                          '${item.author} · ${item.date == null ? 'Data non disponibile' : DateFormat('dd/MM/yyyy HH:mm').format(item.date!.toLocal())} · ${item.branches.join(', ')}',
-                        ),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.open_in_new),
-                          onPressed: item.webUrl.isEmpty
-                              ? null
-                              : () => launchUrl(Uri.parse(item.webUrl),
-                                  mode: LaunchMode.externalApplication),
-                        ),
+                      (item) => CommitSearchTile(
+                        result: item,
+                        loadHistory: () async {
+                          final client = state.client;
+                          if (client == null) {
+                            throw StateError('Connessione non configurata.');
+                          }
+                          return client.getCommitPullRequests(
+                            item.repositoryId,
+                            item.commitId,
+                          );
+                        },
                       ),
                     )
                     .toList(),

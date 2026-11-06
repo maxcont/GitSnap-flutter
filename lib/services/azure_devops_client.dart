@@ -104,6 +104,160 @@ class AzureDevOpsClient {
         .toList();
   }
 
+  /// Queries completed PR associations only when called (for example on a
+  /// detail-history click). Both contained commits and PR merge commits match.
+  ///
+  /// This is Azure DevOps' reported association history, not an exhaustive Git
+  /// lineage: direct pushes, rebases, squashes and cherry-picks can leave gaps.
+  /// An empty list means no associations were reported, not no prior history.
+  /// Source/target refs describe each PR, never the commit's original branch.
+  /// Dates are server creation/completion timestamps, not commit dates.
+  ///
+  /// Throws [AzureDevOpsClientError] for failed, malformed or explicitly
+  /// truncated responses rather than returning misleading partial history.
+  Future<List<PullRequestSummary>> getCommitPullRequests(
+      String repositoryId, String commitId) async {
+    if (repositoryId.trim().isEmpty ||
+        !RegExp(r'^[0-9a-fA-F]{40}$').hasMatch(commitId)) {
+      throw AzureDevOpsClientError(
+          'Commit pull request history requires a repository ID and full commit SHA.');
+    }
+    final url = Uri.parse('$_apiBase/git/repositories/'
+        '${Uri.encodeComponent(repositoryId)}/pullrequestquery?api-version=7.0');
+    try {
+      final response = await http.post(
+        url,
+        headers: _headers,
+        body: json.encode({
+          'queries': [
+            {
+              'type': 'commit',
+              'items': [commitId]
+            },
+            {
+              'type': 'lastMergeCommit',
+              'items': [commitId]
+            },
+          ],
+        }),
+      );
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw AzureDevOpsClientError(
+          'Failed to fetch commit pull request history: '
+          '${response.statusCode}. '
+          '${_messageForStatus(response.statusCode, response.body)}',
+        );
+      }
+      if ((response.headers['x-ms-continuationtoken'] ?? '')
+          .trim()
+          .isNotEmpty) {
+        throw AzureDevOpsClientError(
+            'Incomplete commit pull request history: response was truncated.');
+      }
+      final data = json.decode(response.body);
+      if (data is! Map<String, dynamic> ||
+          data['results'] is! List ||
+          (data['results'] as List).length != 2) {
+        throw const FormatException('Expected two pull request query results.');
+      }
+      final byId = <int, PullRequestSummary>{};
+      final webBase = _apiBase.replaceFirst(RegExp(r'/_apis$'), '');
+      for (final result in data['results'] as List) {
+        if (result is! Map<String, dynamic>) {
+          throw const FormatException('Expected a commit-to-PR dictionary.');
+        }
+        for (final entry in result.entries) {
+          if (entry.key.toLowerCase() != commitId.toLowerCase() ||
+              entry.value is! List) {
+            throw const FormatException('Invalid commit query result entry.');
+          }
+          for (final value in entry.value as List) {
+            if (value is! Map<String, dynamic>) {
+              throw const FormatException('Expected a pull request object.');
+            }
+            final status = value['status'];
+            if (status != 'completed' &&
+                status != 'active' &&
+                status != 'abandoned') {
+              throw const FormatException('Missing or invalid PR status.');
+            }
+            if (status != 'completed') continue;
+            final id = value['pullRequestId'];
+            final repository = value['repository'];
+            if (id is! int ||
+                id <= 0 ||
+                repository is! Map<String, dynamic> ||
+                repository['id'] is! String ||
+                (repository['id'] as String).toLowerCase() !=
+                    repositoryId.toLowerCase() ||
+                value['title'] is! String ||
+                !_hasHistoryRef(value['sourceRefName']) ||
+                !_hasHistoryRef(value['targetRefName'])) {
+              throw const FormatException(
+                  'Incomplete PR identity, repository or source/target refs.');
+            }
+            final created = _parseHistoryDate(value['creationDate']);
+            final closed = _parseHistoryDate(value['closedDate']);
+            if (closed.isBefore(created)) {
+              throw const FormatException('PR completion precedes creation.');
+            }
+            // The request context supplies a web link even for sparse query
+            // results without _links, remoteUrl or url.
+            final summary = PullRequestSummary.fromJson({
+              ...value,
+              'webUrl': '$webBase/_git/'
+                  '${Uri.encodeComponent(repositoryId)}/pullrequest/$id',
+            });
+            byId.putIfAbsent(id, () => summary);
+          }
+        }
+      }
+      return byId.values.toList()
+        ..sort((a, b) {
+          final byDate = b.closedAt!.compareTo(a.closedAt!);
+          return byDate != 0 ? byDate : a.id.compareTo(b.id);
+        });
+    } on FormatException catch (error) {
+      throw AzureDevOpsClientError(
+          'Invalid or incomplete commit pull request history: ${error.message}');
+    } on http.ClientException catch (error) {
+      throw AzureDevOpsClientError(
+          'Error fetching commit pull request history: $error');
+    }
+  }
+
+  static bool _hasHistoryRef(dynamic value) =>
+      value is String &&
+      value.startsWith('refs/heads/') &&
+      value.length > 'refs/heads/'.length;
+
+  static DateTime _parseHistoryDate(dynamic value) {
+    // Require a timezone and reject dates Dart would silently normalize.
+    final match = value is String
+        ? RegExp(
+                r'^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):(\d{2}))$')
+            .firstMatch(value)
+        : null;
+    if (match == null) {
+      throw const FormatException('Missing or invalid PR history timestamp.');
+    }
+    final year = int.parse(match[1]!);
+    final month = int.parse(match[2]!);
+    final day = int.parse(match[3]!);
+    final calendar = DateTime.utc(year, month, day);
+    if (calendar.year != year ||
+        calendar.month != month ||
+        calendar.day != day ||
+        int.parse(match[4]!) > 23 ||
+        int.parse(match[5]!) > 59 ||
+        int.parse(match[6]!) > 59 ||
+        (match[7] != null && int.parse(match[7]!) > 23) ||
+        (match[8] != null && int.parse(match[8]!) > 59)) {
+      throw const FormatException('Out-of-range PR history timestamp.');
+    }
+    return DateTime.parse(value as String).toUtc();
+  }
+
   Future<PullRequestIdentity> getCurrentUser() async {
     final base = baseUrl != null && baseUrl!.isNotEmpty
         ? '${baseUrl!.trim()}/$organization'
