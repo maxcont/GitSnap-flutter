@@ -38,8 +38,8 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
   bool _expandVariabiliA = true;
   bool _expandVariabiliB = true;
   bool _expandConfronto = true;
-  bool _varsPanelAFullHeight = false;
-  bool _varsPanelBFullHeight = false;
+  bool _varsPanelAFullHeight = true;
+  bool _varsPanelBFullHeight = true;
   bool _singlePanelFullWidth = false;
   Set<String> _selectedScopesA = {};
   Set<String> _selectedScopesB = {};
@@ -596,10 +596,10 @@ class _PipelineVariablesTabState extends State<PipelineVariablesTab> {
     return variables.map((v) {
       return DataRow(
         cells: [
-          DataCell(
-              Text(v.name, style: const TextStyle(fontFamily: 'monospace'))),
+          DataCell(SelectableText(v.name,
+              style: const TextStyle(fontFamily: 'monospace'))),
           DataCell(SelectableText(v.displayValue)),
-          DataCell(Text(v.scope)),
+          DataCell(SelectableText(v.scope)),
         ],
       );
     }).toList();

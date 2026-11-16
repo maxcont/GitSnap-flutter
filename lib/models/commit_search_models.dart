@@ -1,3 +1,13 @@
+class CommitSearchRequest {
+  final String repositoryId;
+  final String message;
+
+  const CommitSearchRequest({
+    required this.repositoryId,
+    required this.message,
+  });
+}
+
 class CommitSearchResult {
   final String repositoryId;
   final String repositoryName;

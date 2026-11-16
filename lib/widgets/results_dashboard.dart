@@ -4,9 +4,12 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/azure_models.dart';
 import '../providers/app_state.dart';
+import 'external_link.dart';
 
 class ResultsDashboard extends StatefulWidget {
-  const ResultsDashboard({super.key});
+  final void Function(String repositoryId, String message)? onSearchCommit;
+
+  const ResultsDashboard({super.key, this.onSearchCommit});
 
   @override
   State<ResultsDashboard> createState() => _ResultsDashboardState();
@@ -172,7 +175,7 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                         ),
                                         const SizedBox(height: 8),
                                         if (result.sourceRef != null)
-                                          Text(
+                                          SelectableText(
                                             'Ref: ${result.sourceRef}',
                                             style: const TextStyle(
                                               fontFamily: 'monospace',
@@ -180,7 +183,7 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                             ),
                                           ),
                                         if (result.sourceCommit != null)
-                                          Text(
+                                          SelectableText(
                                             'Commit: ${result.sourceCommit!.substring(0, 7)}',
                                             style: const TextStyle(
                                               fontFamily: 'monospace',
@@ -188,7 +191,7 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                             ),
                                           ),
                                         if (result.sourceCommitAuthor != null)
-                                          Text(
+                                          SelectableText(
                                             result.sourceCommitAuthor!,
                                             style: const TextStyle(
                                               fontStyle: FontStyle.italic,
@@ -196,12 +199,12 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                             ),
                                           ),
                                         if (result.sourceCommitDate != null)
-                                          Text(
+                                          SelectableText(
                                             'Data: ${_formatDate(result.sourceCommitDate)}',
                                             style: const TextStyle(fontSize: 12),
                                           ),
                                         const SizedBox(height: 8),
-                                        Text(
+                                        SelectableText(
                                           result.sourceCommitMessage ??
                                               '(nessun messaggio)',
                                           style: const TextStyle(fontSize: 13),
@@ -230,7 +233,7 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                         ),
                                         const SizedBox(height: 8),
                                         if (result.targetRef != null)
-                                          Text(
+                                          SelectableText(
                                             'Ref: ${result.targetRef}',
                                             style: const TextStyle(
                                               fontFamily: 'monospace',
@@ -238,7 +241,7 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                             ),
                                           ),
                                         if (result.targetCommit != null)
-                                          Text(
+                                          SelectableText(
                                             'Commit: ${result.targetCommit!.substring(0, 7)}',
                                             style: const TextStyle(
                                               fontFamily: 'monospace',
@@ -246,7 +249,7 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                             ),
                                           ),
                                         if (result.targetCommitAuthor != null)
-                                          Text(
+                                          SelectableText(
                                             result.targetCommitAuthor!,
                                             style: const TextStyle(
                                               fontStyle: FontStyle.italic,
@@ -254,12 +257,12 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                             ),
                                           ),
                                         if (result.targetCommitDate != null)
-                                          Text(
+                                          SelectableText(
                                             'Data: ${_formatDate(result.targetCommitDate)}',
                                             style: const TextStyle(fontSize: 12),
                                           ),
                                         const SizedBox(height: 8),
-                                        Text(
+                                        SelectableText(
                                           result.targetCommitMessage ??
                                               '(nessun messaggio)',
                                           style: const TextStyle(fontSize: 13),
@@ -295,6 +298,12 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                   formatDate: _formatDate,
                                   accentColor: Theme.of(context).colorScheme.primary,
                                   icon: Icons.north_east,
+                                  repositoryId: result.repoId,
+                                  repoName: result.repoName,
+                                  baseUrl: appState.baseUrl,
+                                  organization: appState.organization,
+                                  project: appState.project,
+                                  onSearchCommit: widget.onSearchCommit,
                                 ),
                               ],
 
@@ -309,6 +318,12 @@ class _ResultsDashboardState extends State<ResultsDashboard> {
                                   formatDate: _formatDate,
                                   accentColor: Theme.of(context).colorScheme.secondary,
                                   icon: Icons.south_west,
+                                  repositoryId: result.repoId,
+                                  repoName: result.repoName,
+                                  baseUrl: appState.baseUrl,
+                                  organization: appState.organization,
+                                  project: appState.project,
+                                  onSearchCommit: widget.onSearchCommit,
                                 ),
                               ],
                               
@@ -545,6 +560,12 @@ class _CommitsExpansionTile extends StatelessWidget {
   final String Function(String?) formatDate;
   final Color accentColor;
   final IconData icon;
+  final String repositoryId;
+  final String repoName;
+  final String baseUrl;
+  final String organization;
+  final String project;
+  final void Function(String repositoryId, String message)? onSearchCommit;
 
   const _CommitsExpansionTile({
     required this.title,
@@ -552,6 +573,12 @@ class _CommitsExpansionTile extends StatelessWidget {
     required this.formatDate,
     required this.accentColor,
     required this.icon,
+    required this.repositoryId,
+    required this.repoName,
+    required this.baseUrl,
+    required this.organization,
+    required this.project,
+    required this.onSearchCommit,
   });
 
   @override
@@ -609,25 +636,58 @@ class _CommitsExpansionTile extends StatelessWidget {
                   ].join(' ');
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Column(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          caption,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: theme.colorScheme.onSurface.withOpacity(0.55),
-                            fontFamily: 'monospace',
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SelectableText(
+                                caption,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: theme.colorScheme.onSurface.withOpacity(0.55),
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              SelectableText(
+                                commit.comment ?? '(nessun messaggio)',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w400,
+                                  color: theme.colorScheme.onSurface.withOpacity(0.9),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          commit.comment ?? '(nessun messaggio)',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w400,
-                            color: theme.colorScheme.onSurface.withOpacity(0.9),
-                          ),
+                        IconButton(
+                          tooltip: 'Apri commit',
+                          icon: const Icon(Icons.open_in_new),
+                          onPressed: organization.isEmpty || project.isEmpty ||
+                                  repoName.isEmpty || commit.commitId.isEmpty
+                              ? null
+                              : () {
+                                  final webBase = baseUrl.trim().isEmpty
+                                      ? 'https://dev.azure.com'
+                                      : baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+                                  final url = '$webBase/${Uri.encodeComponent(organization)}'
+                                      '/${Uri.encodeComponent(project)}/_git/'
+                                      '${Uri.encodeComponent(repoName)}/commit/'
+                                      '${Uri.encodeComponent(commit.commitId)}';
+                                  openExternalLink(context, url);
+                                },
+                        ),
+                        IconButton(
+                          tooltip: 'Cerca commit',
+                          icon: const Icon(Icons.search),
+                          onPressed: onSearchCommit == null ||
+                                  commit.comment == null ||
+                                  commit.comment!.trim().isEmpty
+                              ? null
+                              : () => onSearchCommit!(repositoryId, commit.comment!),
                         ),
                       ],
                     ),

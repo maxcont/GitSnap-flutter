@@ -12,6 +12,11 @@ Versione Flutter dell'applicazione GitSnap per il confronto di ambienti SOURCE v
 - 🌓 **Tema chiaro/scuro**: Adattamento automatico al tema di sistema
 - 🔀 **Panoramica Pull Request**: Dashboard multi-repository con filtri, dettagli e link Azure DevOps
 
+Nella scheda **Utility pipeline**, le tabelle delle variabili A e B sono
+espanse a tutta altezza per impostazione iniziale. Il pulsante nella barra
+della tabella permette di ridurle; nome, valore visualizzato e ambito possono
+essere selezionati e copiati.
+
 Il link **Apri Compare in Azure DevOps** supporta sia Azure DevOps Services
 sia Server on-premises. Mantiene TARGET come base e SOURCE come versione da
 confrontare: usa i branch per i riferimenti branch e i commit risolti per tag
@@ -139,6 +144,11 @@ lib/
 - **⚠️ DIVERGENTE**: Ci sono commit non allineati
 - **❌ ERRORE**: Errore durante il confronto
 - Espandi ogni repository per vedere dettagli, commit e file modificati
+- Nelle liste dei commit SOURCE e TARGET puoi selezionare e copiare il testo,
+  aprire la commit in Azure DevOps oppure aprire la ricerca con il messaggio
+  e il repository già impostati. La ricerca parte solo quando premi **Cerca**:
+  verifica prima branch e intervallo di date. La ricerca usa il messaggio,
+  quindi commit diverse con lo stesso testo possono comparire nei risultati.
 
 ### 6. Gestione Progetti
 - Clicca sull'icona cartella in alto

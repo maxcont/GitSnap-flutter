@@ -11,7 +11,9 @@ import '../services/pull_request_filter_service.dart';
 import 'commit_search_tile.dart';
 
 class PullRequestsTab extends StatefulWidget {
-  const PullRequestsTab({super.key});
+  final CommitSearchRequest? searchRequest;
+
+  const PullRequestsTab({super.key, this.searchRequest});
 
   @override
   State<PullRequestsTab> createState() => _PullRequestsTabState();
@@ -51,7 +53,9 @@ class _PullRequestsTabState extends State<PullRequestsTab> {
         final filter = state.pullRequestFilter;
         final pullRequests = state.filteredPullRequests;
         return DefaultTabController(
+          key: ObjectKey(widget.searchRequest),
           length: 2,
+          initialIndex: widget.searchRequest == null ? 0 : 1,
           child: Column(
             children: [
               const TabBar(
@@ -148,7 +152,10 @@ class _PullRequestsTabState extends State<PullRequestsTab> {
                         ],
                       ),
                     ),
-                    _CommitSearchView(state: state),
+                    _CommitSearchView(
+                      state: state,
+                      searchRequest: widget.searchRequest,
+                    ),
                   ],
                 ),
               ),
@@ -897,8 +904,9 @@ class _StatusBadge extends StatelessWidget {
 
 class _CommitSearchView extends StatefulWidget {
   final AppState state;
+  final CommitSearchRequest? searchRequest;
 
-  const _CommitSearchView({required this.state});
+  const _CommitSearchView({required this.state, this.searchRequest});
 
   @override
   State<_CommitSearchView> createState() => _CommitSearchViewState();
@@ -916,12 +924,20 @@ class _CommitSearchViewState extends State<_CommitSearchView> {
   bool _showAdvanced = false;
   bool _expandFirstResult = true;
   int _resultPanelStateVersion = 0;
+  bool _showResults = true;
 
   @override
   void initState() {
     super.initState();
     _to = DateTime.now();
     _from = DateTime(_to.year - 1, _to.month, _to.day);
+    final request = widget.searchRequest;
+    if (request != null) {
+      _controller.text = request.message;
+      _repositoryIds = {request.repositoryId};
+      _showAdvanced = true;
+      _showResults = false;
+    }
   }
 
   @override
@@ -1075,7 +1091,7 @@ class _CommitSearchViewState extends State<_CommitSearchView> {
             completed: state.commitSearchCompleted,
             total: state.commitSearchTotal,
           )
-        else ...[
+        else if (_showResults) ...[
           Wrap(
             spacing: 12,
             runSpacing: 12,
@@ -1215,6 +1231,7 @@ class _CommitSearchViewState extends State<_CommitSearchView> {
     setState(() {
       _expandFirstResult = true;
       _resultPanelStateVersion++;
+      _showResults = true;
     });
     widget.state.searchCommits(
       text: _controller.text,

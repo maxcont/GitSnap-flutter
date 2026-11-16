@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
+import '../models/commit_search_models.dart';
 import '../widgets/config_panel.dart';
 import '../widgets/repository_selector.dart';
 import '../widgets/ref_config_panel.dart';
@@ -32,6 +33,17 @@ class _HomeScreenState extends State<HomeScreen>
   static const _tabsWithCastPanel = {0, 3};
 
   int _currentTabIndex = 0;
+  CommitSearchRequest? _commitSearchRequest;
+
+  void _openCommitSearch(String repositoryId, String message) {
+    setState(() {
+      _commitSearchRequest = CommitSearchRequest(
+        repositoryId: repositoryId,
+        message: message,
+      );
+    });
+    _tabController.animateTo(2);
+  }
 
   @override
   void initState() {
@@ -116,9 +128,9 @@ class _HomeScreenState extends State<HomeScreen>
         body: TabBarView(
           controller: _tabController,
           children: [
-            _ComparisonTab(),
+            _ComparisonTab(onSearchCommit: _openCommitSearch),
             const PipelineVariablesTab(),
-            const PullRequestsTab(),
+            PullRequestsTab(searchRequest: _commitSearchRequest),
             const BuildEnvironmentTab(),
           ],
         ),
@@ -128,6 +140,10 @@ class _HomeScreenState extends State<HomeScreen>
 }
 
 class _ComparisonTab extends StatelessWidget {
+  final void Function(String repositoryId, String message) onSearchCommit;
+
+  const _ComparisonTab({required this.onSearchCommit});
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AppState>(
@@ -189,7 +205,7 @@ class _ComparisonTab extends StatelessWidget {
                 const SizedBox(height: 24),
               ],
               if (appState.diffResults.isNotEmpty) ...[
-                const ResultsDashboard(),
+                ResultsDashboard(onSearchCommit: onSearchCommit),
               ],
               if (appState.isLoading)
                 const Center(

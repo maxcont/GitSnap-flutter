@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/commit_search_models.dart';
 import '../models/pull_request_models.dart';
+import 'external_link.dart';
 
 class CommitSearchTile extends StatelessWidget {
   final CommitSearchResult result;
@@ -104,7 +104,7 @@ class CommitSearchTile extends StatelessWidget {
             icon: const Icon(Icons.open_in_new),
             onPressed: result.webUrl.isEmpty
                 ? null
-                : () => _openUrl(context, result.webUrl),
+                : () => openExternalLink(context, result.webUrl),
           ),
         ],
       ),
@@ -246,17 +246,6 @@ class _InlineBranchesState extends State<_InlineBranches> {
 String _formatDate(DateTime? date) => date == null
     ? 'Data non disponibile'
     : DateFormat('dd/MM/yyyy HH:mm').format(date.toLocal());
-
-Future<void> _openUrl(BuildContext context, String url) async {
-  final uri = Uri.tryParse(url);
-  final opened =
-      uri != null && await launchUrl(uri, mode: LaunchMode.externalApplication);
-  if (!opened && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Impossibile aprire il collegamento.')),
-    );
-  }
-}
 
 class _BranchGroups {
   final List<String> principals = [];
@@ -465,7 +454,7 @@ class _CommitDetailsState extends State<_CommitDetails> {
                           icon: const Icon(Icons.open_in_new),
                           onPressed: event.webUrl.isEmpty
                               ? null
-                              : () => _openUrl(context, event.webUrl),
+                              : () => openExternalLink(context, event.webUrl),
                         ),
                       ),
                     ),
@@ -478,7 +467,7 @@ class _CommitDetailsState extends State<_CommitDetails> {
       actions: [
         if (result.webUrl.isNotEmpty)
           TextButton(
-            onPressed: () => _openUrl(context, result.webUrl),
+            onPressed: () => openExternalLink(context, result.webUrl),
             child: const Text('Apri commit'),
           ),
         TextButton(
