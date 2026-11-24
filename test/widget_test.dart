@@ -20,6 +20,18 @@ void main() {
     expect(find.text('PR e commit'), findsOneWidget);
   });
 
+  testWidgets('PR and commit tab exposes the release note check',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(const GitSnapApp());
+    await tester.pump();
+    await tester.tap(find.text('PR e commit'));
+    // Avoid pumpAndSettle: the PR overview may show an endless spinner.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.text('Verifica Release Note'), findsOneWidget);
+  });
+
   testWidgets('Version appears in footer and author is absent from app bar',
       (WidgetTester tester) async {
     await tester.pumpWidget(const GitSnapApp());
