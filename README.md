@@ -11,12 +11,21 @@ Versione Flutter dell'applicazione GitSnap per il confronto di ambienti SOURCE v
 - 🎨 **UI moderna**: Interfaccia Material Design 3
 - 🌓 **Tema chiaro/scuro**: Adattamento automatico al tema di sistema
 - 🔀 **Panoramica Pull Request**: Dashboard multi-repository con filtri, dettagli e link Azure DevOps
+- 📋 **Verifica Release Note**: Confronta tutto ciò che è entrato in una branch di release con le stringhe della Release Note
 
 Nella scheda **Utility pipeline**, le tabelle delle variabili A e B sono
 espanse a tutta altezza per impostazione iniziale. Il pulsante nella barra
 della tabella permette di ridurle; nome, valore visualizzato e ambito possono
 essere selezionati e copiati.
 
+Nella scheda **PR e commit → Verifica Release Note** si indicano una o più
+branch (anche `release/*`), il periodo, i repository e le stringhe della
+Release Note, una per riga. Il tool legge le pull request completate verso
+quelle branch (per data di completamento), i loro commit e i commit diretti
+senza PR. Ogni stringa viene cercata senza distinzione di maiuscole e a parola
+intera in titolo, branch sorgente, descrizione e commit delle PR. Il risultato
+mostra le stringhe **Mancanti** e gli elementi **OK** o **Da verificare**;
+ogni elemento può essere spostato manualmente anche in **Fuori perimetro**.
 Il link **Apri Compare in Azure DevOps** supporta sia Azure DevOps Services
 sia Server on-premises. Mantiene TARGET come base e SOURCE come versione da
 confrontare: usa i branch per i riferimenti branch e i commit risolti per tag
