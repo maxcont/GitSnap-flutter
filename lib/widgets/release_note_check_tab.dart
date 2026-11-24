@@ -14,7 +14,8 @@ class ReleaseNoteCheckTab extends StatefulWidget {
   State<ReleaseNoteCheckTab> createState() => _ReleaseNoteCheckTabState();
 }
 
-class _ReleaseNoteCheckTabState extends State<ReleaseNoteCheckTab> {
+class _ReleaseNoteCheckTabState extends State<ReleaseNoteCheckTab>
+    with AutomaticKeepAliveClientMixin {
   final _branchesController = TextEditingController();
   final _entriesController = TextEditingController();
   late DateTime _from;
@@ -92,7 +93,11 @@ class _ReleaseNoteCheckTabState extends State<ReleaseNoteCheckTab> {
       );
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final state = widget.state;
     final dateFormat = DateFormat('dd/MM/yyyy');
     final entryCount =
