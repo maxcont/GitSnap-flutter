@@ -41,7 +41,10 @@ class ReleaseNoteCheckService {
   static List<Commit> findDirectCommits(ReleaseNoteBranchData data) {
     final pullRequestCommitIds = <String>{};
     final pullRequestSignatures = <String>{};
-    for (final pullRequest in data.pullRequests) {
+    for (final pullRequest in [
+      ...data.pullRequests,
+      ...data.excludedPullRequests,
+    ]) {
       final mergeCommitId = pullRequest.pullRequest.lastMergeCommitId;
       if (mergeCommitId != null) {
         pullRequestCommitIds.add(mergeCommitId.toLowerCase());
@@ -108,8 +111,8 @@ class ReleaseNoteCheckService {
         ));
       }
     }
-    items.sort((left, right) => (right.date ?? DateTime(1970))
-        .compareTo(left.date ?? DateTime(1970)));
+    items.sort((left, right) =>
+        (right.date ?? DateTime(1970)).compareTo(left.date ?? DateTime(1970)));
     final matched = items.expand((item) => item.matchedEntries).toSet();
     return ReleaseNoteCheckResult(
       entries: entries,

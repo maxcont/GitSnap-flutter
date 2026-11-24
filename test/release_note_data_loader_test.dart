@@ -40,7 +40,11 @@ void main() {
               ? ['refs/heads/release/1', 'refs/heads/main']
               : ['refs/heads/main'];
           return http.Response(
-              jsonEncode({'value': [for (final n in names) {'name': n}]}),
+              jsonEncode({
+                'value': [
+                  for (final n in names) {'name': n}
+                ]
+              }),
               200);
         }
         if (path.endsWith('/pullrequests')) {
@@ -49,6 +53,7 @@ void main() {
                 'value': [
                   _pr(1, '2026-11-10T10:00:00Z'),
                   _pr(2, '2026-10-10T10:00:00Z'),
+                  _pr(3, '2026-12-05T10:00:00Z'),
                 ]
               }),
               200);
@@ -61,6 +66,18 @@ void main() {
                 ]
               }),
               200);
+        }
+        if (path.endsWith('/pullRequests/3/commits')) {
+          return http.Response(
+              jsonEncode({
+                'value': [
+                  {'commitId': 'c3', 'comment': 'INC3'}
+                ]
+              }),
+              200);
+        }
+        if (path.contains('/pullRequests/2/')) {
+          return http.Response('unexpected', 500);
         }
         if (path.endsWith('/commits')) {
           return http.Response(
@@ -81,6 +98,8 @@ void main() {
     expect(branch.repositoryUrl, 'https://h/r1');
     expect(branch.pullRequests.single.pullRequest.summary.id, 1);
     expect(branch.pullRequests.single.commits.single.commitId, 'c1');
+    expect(branch.excludedPullRequests.single.pullRequest.summary.id, 3);
+    expect(branch.excludedPullRequests.single.commits.single.commitId, 'c3');
     expect(branch.branchCommits.single.commitId, 'd1');
     expect(result.uninvolvedRepositories, ['Repo2']);
     expect(result.warnings.single, startsWith('Repo3'));

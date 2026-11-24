@@ -29,12 +29,12 @@ class ReleaseNotePullRequest {
   factory ReleaseNotePullRequest.fromJson(Map<String, dynamic> json) {
     final description = json['description'];
     final lastMergeCommit = json['lastMergeCommit'];
-    final mergeId =
-        lastMergeCommit is Map ? lastMergeCommit['commitId'] : null;
+    final mergeId = lastMergeCommit is Map ? lastMergeCommit['commitId'] : null;
     return ReleaseNotePullRequest(
       summary: PullRequestSummary.fromJson(json),
       description: description is String ? description : null,
-      lastMergeCommitId: mergeId is String && mergeId.isNotEmpty ? mergeId : null,
+      lastMergeCommitId:
+          mergeId is String && mergeId.isNotEmpty ? mergeId : null,
     );
   }
 }
@@ -56,6 +56,10 @@ class ReleaseNoteBranchData {
   final String? repositoryUrl;
   final String branch;
   final List<ReleaseNotePullRequestData> pullRequests;
+
+  /// PRs completed after the period: not listed, but their commits are
+  /// still excluded from the direct commits.
+  final List<ReleaseNotePullRequestData> excludedPullRequests;
   final List<Commit> branchCommits;
 
   const ReleaseNoteBranchData({
@@ -64,6 +68,7 @@ class ReleaseNoteBranchData {
     this.repositoryUrl,
     required this.branch,
     required this.pullRequests,
+    this.excludedPullRequests = const [],
     required this.branchCommits,
   });
 }

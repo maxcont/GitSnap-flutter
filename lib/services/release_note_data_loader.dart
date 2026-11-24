@@ -42,12 +42,13 @@ class ReleaseNoteDataLoader {
       (repo) async {
         try {
           final branches = (await client.getBranches(repo.id))
-              .map((b) => (b['name'] as String? ?? '')
-                  .replaceFirst('refs/heads/', ''))
+              .map((b) =>
+                  (b['name'] as String? ?? '').replaceFirst('refs/heads/', ''))
               .where((name) =>
                   name.isNotEmpty &&
-                  branchPatterns.any((pattern) => ReleaseNoteCheckService
-                      .matchesBranchPattern(pattern, name)))
+                  branchPatterns.any((pattern) =>
+                      ReleaseNoteCheckService.matchesBranchPattern(
+                          pattern, name)))
               .toList()
             ..sort();
           if (branches.isEmpty) {
@@ -65,6 +66,7 @@ class ReleaseNoteDataLoader {
       Repository repo,
       String branch,
       List<ReleaseNotePullRequest> pullRequests,
+      List<ReleaseNotePullRequest> excludedPullRequests,
       List<Commit> branchCommits,
     })>[];
     await _inChunks<({Repository repo, String branch})>(
@@ -78,17 +80,20 @@ class ReleaseNoteDataLoader {
             client.getCommitsForBranch(target.repo.id, target.branch,
                 from: from, to: to),
           ]);
-          final pullRequests = (results[0] as List<ReleaseNotePullRequest>)
-              .where((pr) {
+          final pullRequests = <ReleaseNotePullRequest>[];
+          final excludedPullRequests = <ReleaseNotePullRequest>[];
+          for (final pr in results[0] as List<ReleaseNotePullRequest>) {
             final closedAt = pr.summary.closedAt;
-            return closedAt != null &&
-                !closedAt.isBefore(from) &&
-                !closedAt.isAfter(to);
-          }).toList();
+            if (closedAt == null || closedAt.isBefore(from)) continue;
+            // Commits of PRs completed later can be dated within the period.
+            (closedAt.isAfter(to) ? excludedPullRequests : pullRequests)
+                .add(pr);
+          }
           loaded.add((
             repo: target.repo,
             branch: target.branch,
             pullRequests: pullRequests,
+            excludedPullRequests: excludedPullRequests,
             branchCommits: results[1] as List<Commit>,
           ));
         } catch (error) {
@@ -100,7 +105,11 @@ class ReleaseNoteDataLoader {
     final prCommits = <String, List<Commit>>{};
     final prRequests = [
       for (final entry in loaded)
-        for (final pr in entry.pullRequests) (repo: entry.repo, pr: pr),
+        for (final pr in [
+          ...entry.pullRequests,
+          ...entry.excludedPullRequests,
+        ])
+          (repo: entry.repo, pr: pr),
     ];
     await _inChunks<({Repository repo, ReleaseNotePullRequest pr})>(
       prRequests,
@@ -112,10 +121,18 @@ class ReleaseNoteDataLoader {
           prCommits['${request.repo.id}:$id'] =
               await client.getPullRequestCommits(request.repo.id, id);
         } catch (error) {
-          warnings.add('${request.repo.name} PR $id: commit non letti ($error)');
+          warnings
+              .add('${request.repo.name} PR $id: commit non letti ($error)');
         }
       },
     );
+
+    ReleaseNotePullRequestData withCommits(
+            Repository repo, ReleaseNotePullRequest pr) =>
+        ReleaseNotePullRequestData(
+          pullRequest: pr,
+          commits: prCommits['${repo.id}:${pr.summary.id}'] ?? const [],
+        );
 
     final branches = [
       for (final entry in loaded)
@@ -125,12 +142,11 @@ class ReleaseNoteDataLoader {
           repositoryUrl: entry.repo.remoteUrl,
           branch: entry.branch,
           pullRequests: [
-            for (final pr in entry.pullRequests)
-              ReleaseNotePullRequestData(
-                pullRequest: pr,
-                commits:
-                    prCommits['${entry.repo.id}:${pr.summary.id}'] ?? const [],
-              ),
+            for (final pr in entry.pullRequests) withCommits(entry.repo, pr),
+          ],
+          excludedPullRequests: [
+            for (final pr in entry.excludedPullRequests)
+              withCommits(entry.repo, pr),
           ],
           branchCommits: entry.branchCommits,
         ),

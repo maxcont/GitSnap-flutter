@@ -69,19 +69,44 @@ void main() {
       );
 
       expect(
-        ReleaseNoteCheckService.findDirectCommits(data)
-            .map((c) => c.commitId),
+        ReleaseNoteCheckService.findDirectCommits(data).map((c) => c.commitId),
         ['d1'],
       );
     });
 
     test('does not treat empty messages as rebased copies', () {
       final data = _branch(
-        pullRequests: [_pr(1, 'PR', commits: [_commit('a1', '')])],
+        pullRequests: [
+          _pr(1, 'PR', commits: [_commit('a1', '')])
+        ],
         branchCommits: [_commit('d1', '')],
       );
 
       expect(ReleaseNoteCheckService.findDirectCommits(data), hasLength(1));
+    });
+
+    test('excludes commits of PRs completed outside the period', () {
+      final data = ReleaseNoteBranchData(
+        repositoryId: 'r1',
+        repositoryName: 'Repo',
+        branch: 'release/1',
+        pullRequests: const [],
+        excludedPullRequests: [
+          _pr(9, 'Later PR', mergeCommit: 'm9', commits: [
+            _commit('l1', 'INC9 work'),
+          ]),
+        ],
+        branchCommits: [_commit('l1', 'INC9 work'), _commit('d1', 'hotfix')],
+      );
+
+      expect(
+        ReleaseNoteCheckService.findDirectCommits(data).map((c) => c.commitId),
+        ['d1'],
+      );
+      final result =
+          ReleaseNoteCheckService.check(entries: ['INC9'], branches: [data]);
+      expect(result.items.map((item) => item.key), ['commit:r1:release/1:d1']);
+      expect(result.missingEntries, ['INC9']);
     });
   });
 
@@ -108,8 +133,7 @@ void main() {
       expect(byKey['pr:r1:2']!.matchedEntries, {'INC2'});
       expect(byKey['pr:r1:3']!.automaticCategory, ReleaseNoteCategory.ok);
       expect(byKey['pr:r1:4']!.matchedEntries, {'INC4'});
-      expect(byKey['pr:r1:5']!.automaticCategory,
-          ReleaseNoteCategory.toVerify);
+      expect(byKey['pr:r1:5']!.automaticCategory, ReleaseNoteCategory.toVerify);
       expect(byKey['commit:r1:release/1:d1']!.kind,
           ReleaseNoteItemKind.directCommit);
       expect(byKey['commit:r1:release/1:d1']!.automaticCategory,
@@ -154,8 +178,7 @@ void main() {
       expect(ReleaseNoteCheckService.matches('INC376', 'fix inc376: login'),
           isTrue);
       expect(ReleaseNoteCheckService.matches('INC376', '[INC376]'), isTrue);
-      expect(
-          ReleaseNoteCheckService.matches('INC376', 'feature/INC376-login'),
+      expect(ReleaseNoteCheckService.matches('INC376', 'feature/INC376-login'),
           isTrue);
       expect(ReleaseNoteCheckService.matches('INC376', 'INC3761'), isFalse);
       expect(ReleaseNoteCheckService.matches('INC376', 'XINC376'), isFalse);
@@ -177,12 +200,18 @@ void main() {
     });
 
     test('supports exact names, wildcards and refs/heads prefix', () {
-      expect(ReleaseNoteCheckService.matchesBranchPattern(
-          'release/*', 'release/2026.11'), isTrue);
-      expect(ReleaseNoteCheckService.matchesBranchPattern(
-          'refs/heads/main', 'main'), isTrue);
-      expect(ReleaseNoteCheckService.matchesBranchPattern(
-          'release/1', 'release/10'), isFalse);
+      expect(
+          ReleaseNoteCheckService.matchesBranchPattern(
+              'release/*', 'release/2026.11'),
+          isTrue);
+      expect(
+          ReleaseNoteCheckService.matchesBranchPattern(
+              'refs/heads/main', 'main'),
+          isTrue);
+      expect(
+          ReleaseNoteCheckService.matchesBranchPattern(
+              'release/1', 'release/10'),
+          isFalse);
     });
   });
 }
