@@ -155,8 +155,8 @@ lib/
 - Aggiungi nuovi progetti per salvare configurazioni
 - Carica progetti salvati con un click
 
-### 7. Pull Request
-- Apri il tab **Pull request** per caricare le PR da tutti i repository del progetto configurato
+### 7. PR e commit
+- Apri il tab **PR e commit** per caricare le PR da tutti i repository del progetto configurato
 - La vista iniziale mostra PR aperte e bozze aggiornate negli ultimi 30 giorni
 - Filtra per stato, repository, autore, branch di destinazione, date e testo libero
 - Apri una riga per vedere reviewer, stato merge/policy, commit, file e discussioni
@@ -164,7 +164,7 @@ lib/
 - Il PAT deve avere permessi di lettura su **Code**
 
 ### 8. Ricerca commit
-- Nel tab **Pull request**, apri **Ricerca commit** e scegli testo, branch,
+- Nel tab **PR e commit**, apri **Ricerca commit** e scegli testo, branch,
   intervallo di date ed eventuali repository.
 - I risultati mostrano la data dell'autore e i nomi dei branch: usa il pulsante
   con il conteggio per espandere quelli che non entrano nella riga. Il dettaglio

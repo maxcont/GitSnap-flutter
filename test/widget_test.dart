@@ -12,12 +12,12 @@ import 'package:gitsnap_flutter/main.dart';
 import 'package:gitsnap_flutter/services/update_service.dart';
 
 void main() {
-  testWidgets('Home screen exposes the pull request tab',
+  testWidgets('Home screen exposes the PR and commit tab',
       (WidgetTester tester) async {
     await tester.pumpWidget(const GitSnapApp());
     await tester.pump();
 
-    expect(find.text('Pull request'), findsOneWidget);
+    expect(find.text('PR e commit'), findsOneWidget);
   });
 
   testWidgets('Version appears in footer and author is absent from app bar',

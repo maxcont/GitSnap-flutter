@@ -91,7 +91,7 @@ class _HomeScreenState extends State<HomeScreen>
                   text: 'Confronto repository',
                   icon: Icon(Icons.compare_arrows)),
               Tab(text: 'Utility pipeline', icon: Icon(Icons.build)),
-              Tab(text: 'Pull request', icon: Icon(Icons.call_split)),
+              Tab(text: 'PR e commit', icon: Icon(Icons.call_split)),
               Tab(text: 'Verifica build', icon: Icon(Icons.rocket_launch)),
             ],
           ),
