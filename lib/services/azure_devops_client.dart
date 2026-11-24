@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/azure_models.dart';
 import '../models/pull_request_models.dart';
 import '../models/release_models.dart';
+import '../models/release_note_models.dart';
 
 class AzureDevOpsClientError implements Exception {
   final String message;
@@ -483,28 +484,114 @@ class AzureDevOpsClient {
     String branchName, {
     required DateTime from,
     required DateTime to,
+    int pageSize = 2000,
   }) async {
-    final url = Uri.parse('$_apiBase/git/repositories/$repositoryId/commits')
-        .replace(queryParameters: {
-      'api-version': '7.0',
-      r'$top': '2000',
-      'searchCriteria.itemVersion.version': branchName,
-      'searchCriteria.itemVersion.versionType': 'branch',
-      'searchCriteria.fromDate': from.toUtc().toIso8601String(),
-      'searchCriteria.toDate': to.toUtc().toIso8601String(),
-    });
-    final response = await http.get(url, headers: _headers);
-    if (response.statusCode != 200) {
-      throw AzureDevOpsClientError(
-        'Failed to fetch commits: ${response.statusCode}. '
-        '${_messageForStatus(response.statusCode, response.body)}',
-      );
+    final commits = <Commit>[];
+    final seen = <String>{};
+    for (var skip = 0;; skip += pageSize) {
+      final url = Uri.parse('$_apiBase/git/repositories/$repositoryId/commits')
+          .replace(queryParameters: {
+        'api-version': '7.0',
+        r'$top': '$pageSize',
+        r'$skip': '$skip',
+        'searchCriteria.itemVersion.version': branchName,
+        'searchCriteria.itemVersion.versionType': 'branch',
+        'searchCriteria.fromDate': from.toUtc().toIso8601String(),
+        'searchCriteria.toDate': to.toUtc().toIso8601String(),
+      });
+      final response = await http.get(url, headers: _headers);
+      if (response.statusCode != 200) {
+        throw AzureDevOpsClientError(
+          'Failed to fetch commits: ${response.statusCode}. '
+          '${_messageForStatus(response.statusCode, response.body)}',
+        );
+      }
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final page = (data['value'] as List? ?? const [])
+          .whereType<Map>()
+          .map((value) => Commit.fromJson(Map<String, dynamic>.from(value)))
+          .toList();
+      final before = seen.length;
+      for (final commit in page) {
+        if (seen.add(commit.commitId)) commits.add(commit);
+      }
+      // A server ignoring $skip would return the same page forever.
+      if (page.length < pageSize || seen.length == before) return commits;
     }
-    final data = json.decode(response.body) as Map<String, dynamic>;
-    return (data['value'] as List? ?? const [])
-        .whereType<Map>()
-        .map((value) => Commit.fromJson(Map<String, dynamic>.from(value)))
-        .toList();
+  }
+
+  Future<List<ReleaseNotePullRequest>> getCompletedPullRequests(
+    String repositoryId,
+    String targetBranch, {
+    int pageSize = 500,
+  }) async {
+    final targetRef = targetBranch.startsWith('refs/heads/')
+        ? targetBranch
+        : 'refs/heads/$targetBranch';
+    final pullRequests = <ReleaseNotePullRequest>[];
+    final seen = <int>{};
+    for (var skip = 0;; skip += pageSize) {
+      final url =
+          Uri.parse('$_apiBase/git/repositories/$repositoryId/pullrequests')
+              .replace(queryParameters: {
+        'api-version': '7.0',
+        'searchCriteria.status': 'completed',
+        'searchCriteria.targetRefName': targetRef,
+        r'$top': '$pageSize',
+        r'$skip': '$skip',
+      });
+      final response = await http.get(url, headers: _headers);
+      if (response.statusCode != 200) {
+        throw AzureDevOpsClientError(
+          'Failed to fetch pull requests: ${response.statusCode}. '
+          '${_messageForStatus(response.statusCode, response.body)}',
+        );
+      }
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final page = (data['value'] as List? ?? const [])
+          .whereType<Map>()
+          .map((value) =>
+              ReleaseNotePullRequest.fromJson(Map<String, dynamic>.from(value)))
+          .toList();
+      final before = seen.length;
+      for (final pullRequest in page) {
+        if (seen.add(pullRequest.summary.id)) pullRequests.add(pullRequest);
+      }
+      if (page.length < pageSize || seen.length == before) {
+        return pullRequests;
+      }
+    }
+  }
+
+  Future<List<Commit>> getPullRequestCommits(
+    String repositoryId,
+    int pullRequestId,
+  ) async {
+    final commits = <Commit>[];
+    String? token;
+    final usedTokens = <String>{};
+    do {
+      final url = Uri.parse(
+              '$_apiBase/git/repositories/$repositoryId/pullRequests/$pullRequestId/commits')
+          .replace(queryParameters: {
+        'api-version': '7.0',
+        r'$top': '500',
+        if (token != null) 'continuationToken': token,
+      });
+      final response = await http.get(url, headers: _headers);
+      if (response.statusCode != 200) {
+        throw AzureDevOpsClientError(
+          'Failed to fetch pull request commits: ${response.statusCode}. '
+          '${_messageForStatus(response.statusCode, response.body)}',
+        );
+      }
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      commits.addAll((data['value'] as List? ?? const [])
+          .whereType<Map>()
+          .map((value) => Commit.fromJson(Map<String, dynamic>.from(value))));
+      token = response.headers['x-ms-continuationtoken'];
+    } while (token != null && token.isNotEmpty && usedTokens.add(token));
+    return commits;
   }
 
   /// Result of diffs/commits API: commit count (aheadCount) and file list from the same response (like Streamlit).
