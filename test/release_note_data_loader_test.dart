@@ -27,6 +27,7 @@ void main() {
           Repository(id: 'r1', name: 'Repo1', remoteUrl: 'https://h/r1'),
           Repository(id: 'r2', name: 'Repo2'),
           Repository(id: 'r3', name: 'Repo3'),
+          Repository(id: 'r4', name: 'Repo4'),
         ],
         branchPatterns: ['release/*'],
         from: DateTime.utc(2026, 11, 1),
@@ -35,8 +36,11 @@ void main() {
       () => MockClient((request) async {
         final path = request.url.path;
         if (path.contains('/r3/')) return http.Response('boom', 500);
+        if (path.contains('/r4/') && !path.endsWith('/refs')) {
+          return http.Response('boom', 500);
+        }
         if (path.endsWith('/refs')) {
-          final names = path.contains('/r1/')
+          final names = path.contains('/r1/') || path.contains('/r4/')
               ? ['refs/heads/release/1', 'refs/heads/main']
               : ['refs/heads/main'];
           return http.Response(
@@ -101,7 +105,10 @@ void main() {
     expect(branch.excludedPullRequests.single.pullRequest.summary.id, 3);
     expect(branch.excludedPullRequests.single.commits.single.commitId, 'c3');
     expect(branch.branchCommits.single.commitId, 'd1');
+    expect(result.involvedRepositories, {'r1': 'Repo1', 'r4': 'Repo4'});
     expect(result.uninvolvedRepositories, ['Repo2']);
-    expect(result.warnings.single, startsWith('Repo3'));
+    expect(result.warnings, hasLength(2));
+    expect(result.warnings, contains(startsWith('Repo3')));
+    expect(result.warnings, contains(startsWith('Repo4')));
   });
 }

@@ -16,10 +16,13 @@ class ReleaseNoteCheckService {
 
   /// [entry] must not be glued to a letter or digit, so `INC376` does not
   /// match `INC3761`.
-  static bool matches(String entry, String text) => RegExp(
+  static RegExp entryPattern(String entry) => RegExp(
         '(?<![A-Za-z0-9])${RegExp.escape(entry)}(?![A-Za-z0-9])',
         caseSensitive: false,
-      ).hasMatch(text);
+      );
+
+  static bool matches(String entry, String text) =>
+      entryPattern(entry).hasMatch(text);
 
   static List<String> parseBranchPatterns(String text) => text
       .split(RegExp(r'[,;\r\n]'))
@@ -73,6 +76,7 @@ class ReleaseNoteCheckService {
   static ReleaseNoteCheckResult check({
     required List<String> entries,
     required List<ReleaseNoteBranchData> branches,
+    Map<String, String> involvedRepositories = const {},
     List<String> uninvolvedRepositories = const [],
     List<String> warnings = const [],
   }) {
@@ -119,6 +123,10 @@ class ReleaseNoteCheckService {
       items: items,
       missingEntries:
           entries.where((entry) => !matched.contains(entry)).toList(),
+      repositories: {
+        for (final data in branches) data.repositoryId: data.repositoryName,
+        ...involvedRepositories,
+      },
       uninvolvedRepositories: uninvolvedRepositories,
       warnings: warnings,
     );

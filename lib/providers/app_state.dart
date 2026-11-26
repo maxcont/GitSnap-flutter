@@ -519,6 +519,7 @@ class AppState extends ChangeNotifier {
       _releaseNoteResult = ReleaseNoteCheckService.check(
         entries: entries,
         branches: loaded.branches,
+        involvedRepositories: loaded.involvedRepositories,
         uninvolvedRepositories: loaded.uninvolvedRepositories,
         warnings: loaded.warnings,
       );

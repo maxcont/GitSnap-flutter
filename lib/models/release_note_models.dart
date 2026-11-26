@@ -123,6 +123,7 @@ class ReleaseNoteCheckResult {
   final List<String> entries;
   final List<ReleaseNoteItem> items;
   final List<String> missingEntries;
+  final Map<String, String> repositories;
   final List<String> uninvolvedRepositories;
   final List<String> warnings;
 
@@ -130,6 +131,7 @@ class ReleaseNoteCheckResult {
     required this.entries,
     required this.items,
     required this.missingEntries,
+    required this.repositories,
     this.uninvolvedRepositories = const [],
     this.warnings = const [],
   });

@@ -26,6 +26,13 @@ senza PR. Ogni stringa viene cercata senza distinzione di maiuscole e a parola
 intera in titolo, branch sorgente, descrizione e commit delle PR. Il risultato
 mostra le stringhe **Mancanti** e gli elementi **OK** o **Da verificare**;
 ogni elemento può essere spostato manualmente anche in **Fuori perimetro**.
+Il riepilogo generale resta visibile; il pannello laterale dei repository
+permette di selezionarli singolarmente o tutti insieme senza ripetere la
+verifica. I filtri per categoria mostrano solo gli elementi desiderati.
+Le stringhe mancanti nei repository selezionati indicano anche quante sono
+state trovate solo negli altri repository.
+Le occorrenze trovate sono evidenziate nel titolo, nella branch sorgente,
+nella descrizione e nei messaggi completi dei commit.
 Il link **Apri Compare in Azure DevOps** supporta sia Azure DevOps Services
 sia Server on-premises. Mantiene TARGET come base e SOURCE come versione da
 confrontare: usa i branch per i riferimenti branch e i commit risolti per tag

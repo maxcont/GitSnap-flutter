@@ -8,11 +8,13 @@ typedef ReleaseNoteProgress = void Function(
 
 class ReleaseNoteLoadResult {
   final List<ReleaseNoteBranchData> branches;
+  final Map<String, String> involvedRepositories;
   final List<String> uninvolvedRepositories;
   final List<String> warnings;
 
   const ReleaseNoteLoadResult({
     required this.branches,
+    required this.involvedRepositories,
     required this.uninvolvedRepositories,
     required this.warnings,
   });
@@ -155,6 +157,9 @@ class ReleaseNoteDataLoader {
     uninvolved.sort();
     return ReleaseNoteLoadResult(
       branches: branches,
+      involvedRepositories: {
+        for (final target in targets) target.repo.id: target.repo.name,
+      },
       uninvolvedRepositories: uninvolved,
       warnings: warnings,
     );
