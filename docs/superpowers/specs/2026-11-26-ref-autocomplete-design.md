@@ -7,7 +7,7 @@ Nel pannello SOURCE/TARGET (`lib/widgets/ref_config_panel.dart`) offrire, solo s
 ## UI
 
 - Switch **"Suggerimenti branch/tag"** sopra SOURCE/TARGET, spento di default. Lo stato vive in `AppState` per la sessione corrente: oggi l'app non ha persistenza delle preferenze e non viene aggiunta.
-- Con switch attivo, il campo Valore diventa un `Autocomplete<String>` quando il tipo è **Branch** o **Tag pattern**. Il testo resta libero: si può sempre inserire un valore non suggerito.
+- Con switch attivo, il campo Valore diventa un `DropdownMenu<String>` modificabile con filtro quando il tipo è **Branch** o **Tag pattern**. Si usa `DropdownMenu` invece di `RawAutocomplete`, che ricalcola le opzioni solo al cambio del testo e quindi non le mostrerebbe a fine caricamento. Il testo resta libero: si può sempre inserire un valore non suggerito.
 - Tipo **Commit SHA**: nessun autocomplete, campo invariato.
 - Icona ⟳ come suffisso del campo: forza il ricaricamento; durante il caricamento mostra uno spinner.
 - Ogni opzione mostra il nome e il badge `N/M repo`, cioè in quanti repository selezionati esiste.

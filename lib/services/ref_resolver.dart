@@ -20,6 +20,22 @@ class RefResolver {
 
   RefResolver(this.client);
 
+  /// fnmatch-style tag matching (like Streamlit): `*` = any, `?` = one char.
+  static bool matchesTagPattern(String tagName, String pattern) {
+    if (pattern.contains('*') || pattern.contains('?')) {
+      // Escape regex specials but keep * and ? for wildcards (* -> .*, ? -> .)
+      final escaped = pattern
+          .replaceAll(r'\', r'\\')
+          .replaceAll('.', r'\.')
+          .replaceAll('*', '\x00')
+          .replaceAll('?', '\x01');
+      final regexPattern =
+          '^${escaped.replaceAll('\x00', '.*').replaceAll('\x01', '.')}\$';
+      return RegExp(regexPattern, caseSensitive: false).hasMatch(tagName);
+    }
+    return tagName.toLowerCase() == pattern.toLowerCase();
+  }
+
   /// Resolve reference for a single repository
   Future<ResolvedRef> resolveRef(
     Repository repo,
@@ -89,23 +105,9 @@ class RefResolver {
       return name;
     }
 
-    // Find tags matching pattern (fnmatch-style like Streamlit: * = any)
     final matchingTags = tags.where((t) {
       final name = t['name'] as String? ?? '';
-      final tagName = tagNameFromRef(name);
-      if (pattern.contains('*') || pattern.contains('?')) {
-        // Escape regex specials but keep * and ? for wildcards (* -> .*, ? -> .)
-        final escaped = pattern
-            .replaceAll(r'\', r'\\')
-            .replaceAll('.', r'\.')
-            .replaceAll('*', '\x00')
-            .replaceAll('?', '\x01');
-        final regexPattern =
-            '^${escaped.replaceAll('\x00', '.*').replaceAll('\x01', '.')}\$';
-        final regex = RegExp(regexPattern, caseSensitive: false);
-        return regex.hasMatch(tagName);
-      }
-      return tagName.toLowerCase() == pattern.toLowerCase();
+      return matchesTagPattern(tagNameFromRef(name), pattern);
     }).toList();
 
     if (matchingTags.isEmpty) {

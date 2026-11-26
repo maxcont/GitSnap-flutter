@@ -149,6 +149,11 @@ lib/
 - **TARGET**: Ambiente di produzione (es. `master`)
 - Scegli tipo: Branch, Tag pattern, o Commit SHA
 - Inserisci il valore corrispondente
+- Opzionale: attiva lo switch **Suggerimenti branch/tag** per avere l'autocomplete
+  sulle branch o sui tag dei repository selezionati. I ref vengono caricati al
+  primo clic nel campo (⟳ per ricaricarli) e ogni suggerimento indica in quanti
+  repository esiste. Con il tipo Tag pattern viene anche mostrato quanti tag
+  trova il pattern.
 
 ### 4. Esegui Confronto
 - Clicca "Esegui confronto"

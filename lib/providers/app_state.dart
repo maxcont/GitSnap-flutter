@@ -7,6 +7,7 @@ import '../services/release_note_check_service.dart';
 import '../services/release_note_data_loader.dart';
 import '../services/azure_devops_client.dart';
 import '../services/ref_resolver.dart';
+import '../services/ref_suggestion_service.dart';
 import '../services/diff_service.dart';
 import '../services/storage_service.dart';
 import '../services/pull_request_filter_service.dart';
@@ -55,7 +56,11 @@ class AppState extends ChangeNotifier {
   String _releaseNotePhase = '';
   int _releaseNoteCompleted = 0;
   int _releaseNoteTotal = 0;
-
+  bool _refSuggestionsEnabled = false;
+  final Map<RefType, RefSuggestions> _refSuggestions = {};
+  final Map<RefType, Future<void>> _refSuggestionLoads = {};
+  final Map<RefType, String> _refSuggestionErrors = {};
+  String _refSuggestionsKey = '';
   // Projects
   List<ProjectConfig> _projects = [];
   String? _currentProjectId;
@@ -97,6 +102,78 @@ class AppState extends ChangeNotifier {
   String get releaseNotePhase => _releaseNotePhase;
   int get releaseNoteCompleted => _releaseNoteCompleted;
   int get releaseNoteTotal => _releaseNoteTotal;
+  bool get refSuggestionsEnabled => _refSuggestionsEnabled;
+  bool isLoadingRefSuggestions(RefType type) =>
+      _currentRefSuggestionsKey() == _refSuggestionsKey &&
+      _refSuggestionLoads.containsKey(type);
+  String? refSuggestionError(RefType type) =>
+      _currentRefSuggestionsKey() == _refSuggestionsKey
+          ? _refSuggestionErrors[type]
+          : null;
+
+  /// Cached suggestions, only if still valid for the current client and
+  /// repository selection.
+  RefSuggestions? refSuggestions(RefType type) =>
+      _currentRefSuggestionsKey() == _refSuggestionsKey
+          ? _refSuggestions[type]
+          : null;
+
+  String _currentRefSuggestionsKey() =>
+      '${identityHashCode(_client)}|${(_selectedRepoIds.toList()..sort()).join(',')}';
+
+  void setRefSuggestionsEnabled(bool value) {
+    _refSuggestionsEnabled = value;
+    notifyListeners();
+  }
+
+  /// Loads branch/tag suggestions for the selected repositories, reusing the
+  /// cache unless [force] is set.
+  Future<void> ensureRefSuggestions(RefType type, {bool force = false}) {
+    if (type == RefType.commit) return Future.value();
+    final key = _currentRefSuggestionsKey();
+    if (key != _refSuggestionsKey) {
+      _refSuggestions.clear();
+      _refSuggestionErrors.clear();
+      _refSuggestionLoads.clear();
+      _refSuggestionsKey = key;
+    }
+    final pending = _refSuggestionLoads[type];
+    if (pending != null) return pending;
+    if (!force && _refSuggestions.containsKey(type)) return Future.value();
+    final repositories = _repositories
+        .where((repo) => _selectedRepoIds.contains(repo.id))
+        .toList();
+    if (_client == null || repositories.isEmpty) {
+      _refSuggestionErrors[type] = 'Carica e seleziona almeno un repository.';
+      notifyListeners();
+      return Future.value();
+    }
+    _refSuggestionErrors.remove(type);
+    final client = _client!;
+    late final Future<void> load;
+    load = () async {
+      try {
+        final result =
+            await RefSuggestionService.load(client, repositories, type);
+        if (key != _refSuggestionsKey) return;
+        if (result.refsByRepository.isEmpty) {
+          _refSuggestionErrors[type] = 'Impossibile leggere i repository.';
+        } else {
+          _refSuggestions[type] = result;
+        }
+      } catch (error) {
+        if (key == _refSuggestionsKey) _refSuggestionErrors[type] = '$error';
+      } finally {
+        if (identical(_refSuggestionLoads[type], load)) {
+          _refSuggestionLoads.remove(type);
+        }
+        notifyListeners();
+      }
+    }();
+    _refSuggestionLoads[type] = load;
+    notifyListeners();
+    return load;
+  }
 
   ReleaseNoteCategory releaseNoteCategoryOf(ReleaseNoteItem item) =>
       _releaseNoteMoves[item.key] ?? item.automaticCategory;
