@@ -9,6 +9,7 @@ import '../models/pull_request_models.dart';
 import '../providers/app_state.dart';
 import '../services/pull_request_filter_service.dart';
 import 'commit_search_tile.dart';
+import 'release_note_check_tab.dart';
 
 class PullRequestsTab extends StatefulWidget {
   final CommitSearchRequest? searchRequest;
@@ -54,7 +55,7 @@ class _PullRequestsTabState extends State<PullRequestsTab> {
         final pullRequests = state.filteredPullRequests;
         return DefaultTabController(
           key: ObjectKey(widget.searchRequest),
-          length: 2,
+          length: 3,
           initialIndex: widget.searchRequest == null ? 0 : 1,
           child: Column(
             children: [
@@ -64,6 +65,7 @@ class _PullRequestsTabState extends State<PullRequestsTab> {
                 tabs: [
                   Tab(text: 'Panoramica PR'),
                   Tab(text: 'Ricerca commit'),
+                  Tab(text: 'Verifica Release Note'),
                 ],
               ),
               Expanded(
@@ -156,6 +158,7 @@ class _PullRequestsTabState extends State<PullRequestsTab> {
                       state: state,
                       searchRequest: widget.searchRequest,
                     ),
+                    ReleaseNoteCheckTab(state: state),
                   ],
                 ),
               ),

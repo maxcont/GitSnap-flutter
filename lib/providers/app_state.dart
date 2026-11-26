@@ -2,6 +2,9 @@ import 'package:flutter/foundation.dart';
 import '../models/azure_models.dart';
 import '../models/commit_search_models.dart';
 import '../models/pull_request_models.dart';
+import '../models/release_note_models.dart';
+import '../services/release_note_check_service.dart';
+import '../services/release_note_data_loader.dart';
 import '../services/azure_devops_client.dart';
 import '../services/ref_resolver.dart';
 import '../services/diff_service.dart';
@@ -45,6 +48,13 @@ class AppState extends ChangeNotifier {
   String _commitSearchPhase = '';
   int _commitSearchCompleted = 0;
   int _commitSearchTotal = 0;
+  ReleaseNoteCheckResult? _releaseNoteResult;
+  Map<String, ReleaseNoteCategory> _releaseNoteMoves = {};
+  bool _isCheckingReleaseNote = false;
+  String? _releaseNoteError;
+  String _releaseNotePhase = '';
+  int _releaseNoteCompleted = 0;
+  int _releaseNoteTotal = 0;
 
   // Projects
   List<ProjectConfig> _projects = [];
@@ -81,6 +91,15 @@ class AppState extends ChangeNotifier {
   String get commitSearchPhase => _commitSearchPhase;
   int get commitSearchCompleted => _commitSearchCompleted;
   int get commitSearchTotal => _commitSearchTotal;
+  ReleaseNoteCheckResult? get releaseNoteResult => _releaseNoteResult;
+  bool get isCheckingReleaseNote => _isCheckingReleaseNote;
+  String? get releaseNoteError => _releaseNoteError;
+  String get releaseNotePhase => _releaseNotePhase;
+  int get releaseNoteCompleted => _releaseNoteCompleted;
+  int get releaseNoteTotal => _releaseNoteTotal;
+
+  ReleaseNoteCategory releaseNoteCategoryOf(ReleaseNoteItem item) =>
+      _releaseNoteMoves[item.key] ?? item.automaticCategory;
   List<PullRequestSummary> get filteredPullRequests =>
       PullRequestFilterService.filter(
         pullRequests: _allPullRequests,
@@ -449,6 +468,76 @@ class AppState extends ChangeNotifier {
       _isSearchingCommits = false;
       notifyListeners();
     }
+  }
+
+  Future<void> runReleaseNoteCheck({
+    required String entriesText,
+    required String branchPatternsText,
+    required Set<String> repositoryIds,
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final entries = ReleaseNoteCheckService.parseEntries(entriesText);
+    final branchPatterns =
+        ReleaseNoteCheckService.parseBranchPatterns(branchPatternsText);
+    if (_client == null) {
+      _releaseNoteError = 'Carica prima i repository.';
+      notifyListeners();
+      return;
+    }
+    if (entries.isEmpty || branchPatterns.isEmpty) {
+      _releaseNoteError =
+          'Inserisci almeno una branch e una stringa della Release Note.';
+      notifyListeners();
+      return;
+    }
+    _isCheckingReleaseNote = true;
+    _releaseNoteError = null;
+    _releaseNoteResult = null;
+    _releaseNoteMoves = {};
+    _releaseNotePhase = 'Preparazione della verifica';
+    _releaseNoteCompleted = 0;
+    _releaseNoteTotal = 0;
+    notifyListeners();
+    try {
+      final repositories = _repositories
+          .where((repo) =>
+              repositoryIds.isEmpty || repositoryIds.contains(repo.id))
+          .toList();
+      final loaded = await ReleaseNoteDataLoader(_client!).load(
+        repositories: repositories,
+        branchPatterns: branchPatterns,
+        from: from,
+        to: to,
+        onProgress: (phase, completed, total) {
+          _releaseNotePhase = phase;
+          _releaseNoteCompleted = completed;
+          _releaseNoteTotal = total;
+          notifyListeners();
+        },
+      );
+      _releaseNoteResult = ReleaseNoteCheckService.check(
+        entries: entries,
+        branches: loaded.branches,
+        involvedRepositories: loaded.involvedRepositories,
+        uninvolvedRepositories: loaded.uninvolvedRepositories,
+        warnings: loaded.warnings,
+      );
+    } catch (error) {
+      _releaseNoteError = 'Errore durante la verifica: $error';
+    } finally {
+      _isCheckingReleaseNote = false;
+      notifyListeners();
+    }
+  }
+
+  void moveReleaseNoteItem(ReleaseNoteItem item, ReleaseNoteCategory category) {
+    if (category == item.automaticCategory) {
+      _releaseNoteMoves.remove(item.key);
+    } else {
+      _releaseNoteMoves[item.key] = category;
+    }
+    notifyListeners();
   }
 
   // Run comparison
